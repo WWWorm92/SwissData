@@ -1,596 +1,717 @@
 <!doctype html>
 <html lang="ru">
 <head>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width,initial-scale=1"/>
-    <title>Overlay</title>
-    <style>
-        :root{
-          --bg: rgba(0,0,0,0);
-          --panel: rgba(12,14,20,.86);
-          --panel2: rgba(16,20,30,.92);
-          --stroke: rgba(255,255,255,.10);
-          --text: rgba(255,255,255,.98);
-          --muted: rgba(255,255,255,.70);
-          --shadow: 0 22px 80px rgba(0,0,0,.58);
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Overlay</title>
+  <style>
+    :root{
+      --bg: rgba(0,0,0,0);
+      --panel: rgba(12,14,20,.86);
+      --panel2: rgba(16,20,30,.92);
+      --stroke: rgba(255,255,255,.10);
+      --text: rgba(255,255,255,.98);
+      --muted: rgba(255,255,255,.70);
+      --shadow: 0 22px 80px rgba(0,0,0,.58);
 
-          /* default = blue */
-          --accentA: #00d2ff;
-          --accentB: #3a7bff;
+      /* default = blue */
+      --accentA: #00d2ff;
+      --accentB: #3a7bff;
 
-          /* split = green */
-          --goodA: #34d399;
-          --goodB: #10b981;
+      /* split = green */
+      --goodA: #34d399;
+      --goodB: #10b981;
 
-          /* finish = gold */
-          --finA: #fbbf24;
-          --finB: #f59e0b;
-        }
+      /* finish = gold */
+      --finA: #fbbf24;
+      --finB: #f59e0b;
+    }
 
-        html,body{height:100%;margin:0;background:var(--bg);font-family:Segoe UI, Inter, Roboto, Arial, sans-serif;}
-        *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:var(--bg);font-family:Segoe UI, Inter, Roboto, Arial, sans-serif;}
+    *{box-sizing:border-box}
 
-        .wrap{
-          width:100%;
-          height:100%;
-          padding: 28px 34px;
-          display:flex;
-          flex-direction:column;
-          gap: 18px;
-          opacity:0;
-          transform: translateY(-8px) scale(.995);
-          transition: opacity .22s ease, transform .22s ease;
-        }
-        .wrap.on{ opacity:1; transform: translateY(0) scale(1); }
+    .wrap{
+      width:100%;
+      height:100%;
+      padding: 28px 34px;
+      display:flex;
+      flex-direction:column;
+      gap: 18px;
+      opacity:0;
+      transform: translateY(-8px) scale(.995);
+      transition: opacity .22s ease, transform .22s ease;
+    }
+    .wrap.on{ opacity:1; transform: translateY(0) scale(1); }
 
-        .topbar{
-          display:flex;
-          align-items:center;
-          justify-content:flex-start;
-          padding: 0 10px;
-          color: var(--muted);
-          min-height: 44px;
-        }
+    .topbar{
+      display:flex;
+      align-items:center;
+      justify-content:flex-start;
+      padding: 0 10px;
+      color: var(--muted);
+      min-height: 44px;
+    }
 
-        .runPill{
-          display:inline-flex;
-          align-items:center;
-          gap: 12px;
-          padding: 10px 16px;
-          border-radius: 999px;
-          background: linear-gradient(90deg, rgba(0,210,255,.16), rgba(58,123,255,.12));
-          border: 1px solid rgba(0,210,255,.25);
-          box-shadow: 0 12px 44px rgba(0,0,0,.36);
-          max-width: 70vw;
-          overflow:hidden;
-        }
-        .dot{
-          width:10px;height:10px;border-radius:50%;
-          background: linear-gradient(180deg, var(--accentA), var(--accentB));
-          box-shadow: 0 0 18px rgba(0,210,255,.55);
-          flex:0 0 auto;
-          position:relative;
-        }
-        .dot::after{
-          content:"";
-          position:absolute; inset:-14px;
-          border-radius:50%;
-          background: radial-gradient(circle, rgba(0,210,255,.22), rgba(0,0,0,0) 62%);
-          animation: pulse 1.2s ease-in-out infinite;
-        }
-        @keyframes pulse{
-          0%,100%{transform:scale(.75);opacity:.45}
-          50%{transform:scale(1.05);opacity:.75}
-        }
+    .runPill{
+      display:inline-flex;
+      align-items:center;
+      gap: 12px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(0,210,255,.16), rgba(58,123,255,.12));
+      border: 1px solid rgba(0,210,255,.25);
+      box-shadow: 0 12px 44px rgba(0,0,0,.36);
+      max-width: 70vw;
+      overflow:hidden;
+    }
+    .dot{
+      width:10px;height:10px;border-radius:50%;
+      background: linear-gradient(180deg, var(--accentA), var(--accentB));
+      box-shadow: 0 0 18px rgba(0,210,255,.55);
+      flex:0 0 auto;
+      position:relative;
+    }
+    .dot::after{
+      content:"";
+      position:absolute; inset:-14px;
+      border-radius:50%;
+      background: radial-gradient(circle, rgba(0,210,255,.22), rgba(0,0,0,0) 62%);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse{
+      0%,100%{transform:scale(.75);opacity:.45}
+      50%{transform:scale(1.05);opacity:.75}
+    }
 
-        .runText{
-          font-weight: 950;
-          font-size: clamp(14px, 1.35vw, 22px);
-          color: var(--text);
-          white-space:nowrap;
-          overflow:hidden;
-          text-overflow:ellipsis;
-          letter-spacing:.02em;
-        }
+    .runText{
+      font-weight: 950;
+      font-size: clamp(14px, 1.35vw, 22px);
+      color: var(--text);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      letter-spacing:.02em;
+    }
 
-        .grid{
-          display:grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 22px;
-          align-items:stretch;
-        }
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 22px;
+      align-items:stretch;
+    }
 
-        .card{
-          position:relative;
-          overflow:hidden;
-          border-radius: 24px;
-          background: linear-gradient(180deg, var(--panel2), var(--panel));
-          border: 1px solid var(--stroke);
-          box-shadow: var(--shadow);
-          padding: 18px 20px 18px 22px;
-          min-height: 200px;
-          transform: translateY(10px);
-          opacity:0;
-          transition: opacity .22s ease, transform .22s ease;
+    .card{
+      position:relative;
+      overflow:hidden;
+      border-radius: 24px;
+      background: linear-gradient(180deg, var(--panel2), var(--panel));
+      border: 1px solid var(--stroke);
+      box-shadow: var(--shadow);
+      padding: 18px 20px 18px 22px;
+      min-height: 200px;
+      transform: translateY(10px);
+      opacity:0;
+      transition: opacity .22s ease, transform .22s ease;
 
-          /* bar color vars */
-          --barA: var(--accentA);
-          --barB: var(--accentB);
-        }
-        .card.show{ opacity:1; transform: translateY(0); }
+      /* bar color vars */
+      --barA: var(--accentA);
+      --barB: var(--accentB);
+    }
+    .card.show{ opacity:1; transform: translateY(0); }
 
-        .card::before{
-          content:"";
-          position:absolute;
-          left:0;top:0;bottom:0;
-          width: 10px;
-          background: linear-gradient(180deg, var(--barA), var(--barB));
-          opacity:.95;
-        }
-        .card::after{
-          content:"";
-          position:absolute;
-          right:-140px; top:-160px;
-          width: 420px; height: 420px;
-          border-radius: 50%;
-          background:
-            radial-gradient(circle at 35% 35%, rgba(0,210,255,.18), rgba(0,0,0,0) 60%),
-            radial-gradient(circle at 65% 55%, rgba(58,123,255,.14), rgba(0,0,0,0) 62%);
-          transform: rotate(18deg);
-          pointer-events:none;
-          animation: orb 7.5s ease-in-out infinite;
-          filter: blur(.2px);
-        }
-        @keyframes orb{
-          0%,100%{transform: translate(0,0) rotate(12deg); opacity:.95}
-          50%{transform: translate(-26px, 18px) rotate(22deg); opacity:.80}
-        }
+    .card::before{
+      content:"";
+      position:absolute;
+      left:0;top:0;bottom:0;
+      width: 10px;
+      background: linear-gradient(180deg, var(--barA), var(--barB));
+      opacity:.95;
+    }
+    .card::after{
+      content:"";
+      position:absolute;
+      right:-140px; top:-160px;
+      width: 420px; height: 420px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 35% 35%, rgba(0,210,255,.18), rgba(0,0,0,0) 60%),
+        radial-gradient(circle at 65% 55%, rgba(58,123,255,.14), rgba(0,0,0,0) 62%);
+      transform: rotate(18deg);
+      pointer-events:none;
+      animation: orb 7.5s ease-in-out infinite;
+      filter: blur(.2px);
+    }
+    @keyframes orb{
+      0%,100%{transform: translate(0,0) rotate(12deg); opacity:.95}
+      50%{transform: translate(-26px, 18px) rotate(22deg); opacity:.80}
+    }
 
-        .shine{
-          position:absolute;
-          left:-30%;
-          top:-70%;
-          width: 60%;
-          height: 220%;
-          background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.10), rgba(255,255,255,0));
-          transform: rotate(18deg);
-          animation: sweep 4.6s ease-in-out infinite;
-          pointer-events:none;
-          opacity:.55;
-        }
-        @keyframes sweep{
-          0%{transform: translateX(-80%) rotate(18deg); opacity:.0}
-          15%{opacity:.55}
-          45%{opacity:.55}
-          60%{opacity:.0}
-          100%{transform: translateX(190%) rotate(18deg); opacity:0}
-        }
+    .shine{
+      position:absolute;
+      left:-30%;
+      top:-70%;
+      width: 60%;
+      height: 220%;
+      background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.10), rgba(255,255,255,0));
+      transform: rotate(18deg);
+      animation: sweep 4.6s ease-in-out infinite;
+      pointer-events:none;
+      opacity:.55;
+    }
+    @keyframes sweep{
+      0%{transform: translateX(-80%) rotate(18deg); opacity:.0}
+      15%{opacity:.55}
+      45%{opacity:.55}
+      60%{opacity:.0}
+      100%{transform: translateX(190%) rotate(18deg); opacity:0}
+    }
 
-        .head{
-          display:flex;
-          align-items:center;
-          gap: 14px;
-          padding-left: 8px;
-          min-width:0;
-        }
+    .head{
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      gap: 14px;
+      padding-left: 8px;
+      min-width:0;
+    }
+    .leftInfo{
+      display:flex;
+      align-items:center;
+      gap: 14px;
+      min-width:0;
+      flex: 1 1 auto;
+    }
+    .countryBox{
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      flex: 0 0 auto;
+    }
 
-        .flagImg{
-          width: 38px;
-          height: 26px;
-          border-radius: 6px;
-          object-fit: cover;
-          border: 1px solid rgba(255,255,255,.18);
-          box-shadow: 0 10px 28px rgba(0,0,0,.35);
-          opacity: .98;
-          transform: translateY(0);
-          transition: opacity .16s ease, transform .16s ease;
-          flex: 0 0 auto;
-        }
+    .flagImg{
+      width: 38px;
+      height: 26px;
+      border-radius: 6px;
+      object-fit: cover;
+      border: 1px solid rgba(255,255,255,.18);
+      box-shadow: 0 10px 28px rgba(0,0,0,.35);
+      opacity: .98;
+      transform: translateY(0);
+      transition: opacity .16s ease, transform .16s ease;
+      flex: 0 0 auto;
+    }
 
-        .bib{
-          font-variant-numeric: tabular-nums;
-          font-weight: 980;
-          font-size: clamp(32px, 2.85vw, 48px);
-          color: var(--text);
-          letter-spacing:.02em;
-          flex: 0 0 auto;
-        }
-        .name{
-          font-weight: 950;
-          font-size: clamp(18px, 2.05vw, 36px);
-          color: var(--text);
-          white-space:nowrap;
-          overflow:hidden;
-          text-overflow:ellipsis;
-          line-height:1.05;
-          min-width:0;
-          flex: 1 1 auto;
-        }
+    .bib{
+      font-variant-numeric: tabular-nums;
+      font-weight: 980;
+      font-size: clamp(32px, 2.85vw, 48px);
+      color: var(--text);
+      letter-spacing:.02em;
+      flex: 0 0 auto;
+    }
+    .name{
+      font-weight: 950;
+      font-size: clamp(18px, 2.05vw, 36px);
+      color: var(--text);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      line-height:1.05;
+      min-width:0;
+      flex: 1 1 auto;
+    }
 
-        .time{
-          padding-left: 8px;
-          margin-top: 14px;
-          font-variant-numeric: tabular-nums;
-          font-weight: 1000;
-          font-size: clamp(46px, 4.6vw, 86px);
-          letter-spacing:.045em;
-          line-height:1;
-          color: var(--text);
-          text-shadow: 0 12px 48px rgba(0,0,0,.38);
-          transform-origin:left center;
-        }
+    .cc{
+      font-weight: 950;
+      font-variant-numeric: tabular-nums;
+      font-size: clamp(14px, 1.25vw, 20px);
+      letter-spacing: .08em;
+      color: var(--muted);
+      padding-top: 2px;
+    }
 
-        .tick{ animation: tick .16s ease; }
-        @keyframes tick{
-          0%{transform: translateY(1px) scale(1.002); opacity:.92}
-          100%{transform: translateY(0) scale(1); opacity:1}
-        }
+    /* плашка дистанции (отдельно от карточки визуально, но живёт внутри card) */
+    .distPill{
+      position:absolute;
+      right: 20px;
+      top: 150px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(255,255,255,.10), rgba(255,255,255,.06));
+      border: 1px solid rgba(255,255,255,.14);
+      box-shadow: 0 14px 48px rgba(0,0,0,.42);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      pointer-events:none;
+      opacity:0;
+      transform: translateY(-6px) scale(.98);
+      transition: opacity .18s ease, transform .18s ease;
+    }
+    .distPill.show{
+      opacity:1;
+      transform: translateY(0) scale(1);
+    }
+    .distText{
+      font-weight: 980;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: .08em;
+      font-size: clamp(12px, 1.1vw, 16px);
+      color: rgba(255,255,255,.90);
+      text-transform: uppercase;
+      white-space:nowrap;
+    }
 
-        .freeze{ animation: freezePop .22s ease; }
-        @keyframes freezePop{
-          0%{transform: scale(1.00)}
-          40%{transform: scale(1.03)}
-          100%{transform: scale(1.00)}
-        }
+    .time{
+      padding-left: 8px;
+      margin-top: 14px;
+      font-variant-numeric: tabular-nums;
+      font-weight: 1000;
+      font-size: clamp(46px, 4.6vw, 86px);
+      letter-spacing:.045em;
+      line-height:1;
+      color: var(--text);
+      text-shadow: 0 12px 48px rgba(0,0,0,.38);
+      transform-origin:left center;
+    }
 
-        .baseline{
-          margin-top: 14px;
-          height: 1px;
-          background: linear-gradient(90deg, rgba(255,255,255,.16), rgba(255,255,255,0));
-          opacity:.95;
-        }
+    .tick{ animation: tick .16s ease; }
+    @keyframes tick{
+      0%{transform: translateY(1px) scale(1.002); opacity:.92}
+      100%{transform: translateY(0) scale(1); opacity:1}
+    }
 
-        /* SPLIT: blue -> green (на время "заморозки") */
-        .card.split{
-          --barA: var(--goodA);
-          --barB: var(--goodB);
-          box-shadow: 0 22px 80px rgba(0,0,0,.58), 0 0 0 1px rgba(52,211,153,.12), 0 0 44px rgba(52,211,153,.10);
-        }
+    .freeze{ animation: freezePop .22s ease; }
+    @keyframes freezePop{
+      0%{transform: scale(1.00)}
+      40%{transform: scale(1.03)}
+      100%{transform: scale(1.00)}
+    }
 
-        /* FINISH */
-        .card.finished{
-          --barA: var(--finA);
-          --barB: var(--finB);
-          box-shadow: 0 22px 80px rgba(0,0,0,.58), 0 0 0 1px rgba(251,191,36,.14), 0 0 44px rgba(251,191,36,.10);
-        }
+    .baseline{
+      margin-top: 14px;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(255,255,255,.16), rgba(255,255,255,0));
+      opacity:.95;
+    }
 
-        .hidden{display:none !important;}
+    /* SPLIT: blue -> green (на время "заморозки") */
+    .card.split{
+      --barA: var(--goodA);
+      --barB: var(--goodB);
+      box-shadow: 0 22px 80px rgba(0,0,0,.58), 0 0 0 1px rgba(52,211,153,.12), 0 0 44px rgba(52,211,153,.10);
+    }
 
-        @media (max-width: 1400px){
-          .wrap{padding: 18px 22px;}
-          .card{min-height: 176px;}
-          .flagImg{width:34px;height:24px;}
-        }
-        .head{
-  display:flex;
-  align-items:center;
-  justify-content: space-between;
-  gap: 14px;
-  padding-left: 8px;
-  min-width:0;
-}
-.leftInfo{
-  display:flex;
-  align-items:center;
-  gap: 14px;
-  min-width:0;
-  flex: 1 1 auto;
-}
-.countryBox{
-  display:flex;
-  align-items:center;
-  gap: 10px;
-  flex: 0 0 auto;
-}
-.cc{
-  font-weight: 950;
-  font-variant-numeric: tabular-nums;
-  font-size: clamp(14px, 1.25vw, 20px);
-  letter-spacing: .08em;
-  color: var(--muted);
-  padding-top: 2px;
-}
+    /* FINISH */
+    .card.finished{
+      --barA: var(--finA);
+      --barB: var(--finB);
+      box-shadow: 0 22px 80px rgba(0,0,0,.58), 0 0 0 1px rgba(251,191,36,.14), 0 0 44px rgba(251,191,36,.10);
+    }
 
-    </style>
+    .hidden{display:none !important;}
+
+    @media (max-width: 1400px){
+      .wrap{padding: 18px 22px;}
+      .card{min-height: 176px;}
+      .flagImg{width:34px;height:24px;}
+      .distPill{right: 16px; top: 8px;}
+    }
+  </style>
 </head>
 <body>
 <div id="wrap" class="wrap">
-    <div class="topbar">
-        <div class="runPill">
-            <div class="dot"></div>
-            <div id="run" class="runText">Заезд: —</div>
+  <div class="topbar">
+    <div class="runPill">
+      <div class="dot"></div>
+      <div id="run" class="runText">Заезд: —</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div id="L" class="card hidden">
+      <div class="shine"></div>
+
+      <!-- плашка дистанции -->
+      <div id="LdP" class="distPill hidden"><span id="LdT" class="distText">—</span></div>
+
+      <div class="head">
+        <div class="leftInfo">
+          <div id="Lb" class="bib">—</div>
+          <div id="Ln" class="name">—</div>
         </div>
+
+        <div id="Lcx" class="countryBox hidden">
+          <img id="Lf" class="flagImg hidden" alt="">
+          <div id="Lc" class="cc hidden"></div>
+        </div>
+      </div>
+
+      <div id="Lt" class="time">0.000</div>
+      <div class="baseline"></div>
     </div>
 
-    <div class="grid">
-        <div id="L" class="card hidden">
-            <div class="shine"></div>
-            <div class="head">
-                <div class="leftInfo">
-                    <div id="Lb" class="bib">—</div>
-                    <div id="Ln" class="name">—</div>
-                </div>
+    <div id="R" class="card hidden">
+      <div class="shine"></div>
 
-                <div id="Lcx" class="countryBox hidden">
-                    <img id="Lf" class="flagImg hidden" alt="">
-                    <div id="Lc" class="cc hidden"></div>
-                </div>
-            </div>
+      <!-- плашка дистанции -->
+      <div id="RdP" class="distPill hidden"><span id="RdT" class="distText">—</span></div>
 
-            <div id="Lt" class="time">0.000</div>
-            <div class="baseline"></div>
+      <div class="head">
+        <div class="leftInfo">
+          <div id="Rb" class="bib">—</div>
+          <div id="Rn" class="name">—</div>
         </div>
 
-        <div id="R" class="card hidden">
-            <div class="shine"></div>
-            <div class="head">
-                <div class="leftInfo">
-                    <div id="Rb" class="bib">—</div>
-                    <div id="Rn" class="name">—</div>
-                </div>
-
-                <div id="Rcx" class="countryBox hidden">
-                    <img id="Rf" class="flagImg hidden" alt="">
-                    <div id="Rc" class="cc hidden"></div>
-                </div>
-            </div>
-
-            <div id="Rt" class="time">0.000</div>
-            <div class="baseline"></div>
+        <div id="Rcx" class="countryBox hidden">
+          <img id="Rf" class="flagImg hidden" alt="">
+          <div id="Rc" class="cc hidden"></div>
         </div>
+      </div>
+
+      <div id="Rt" class="time">0.000</div>
+      <div class="baseline"></div>
     </div>
+  </div>
 </div>
 
 <script>
-    let state = null;
-    let lastOk = 0;
-    let lastShown = { L: "", R: "" };
-    let lastFreezeFlag = { L: false, R: false };
-    let lastFlag = { L: "", R: "" };
+  let state = null;
+  let lastOk = 0;
+  let lastShown = { L: "", R: "" };
+  let lastFreezeFlag = { L: false, R: false };
+  let lastFlag = { L: "", R: "" };
 
-    const wrap = document.getElementById("wrap");
-    const runEl = document.getElementById("run");
+  const wrap = document.getElementById("wrap");
+  const runEl = document.getElementById("run");
 
-    const L = document.getElementById("L");
-    const R = document.getElementById("R");
-    const Lf = document.getElementById("Lf");
-    const Rf = document.getElementById("Rf");
-    const Lb = document.getElementById("Lb");
-    const Ln = document.getElementById("Ln");
-    const Lt = document.getElementById("Lt");
-    const Rb = document.getElementById("Rb");
-    const Rn = document.getElementById("Rn");
-    const Rt = document.getElementById("Rt");
-    const Lcx = document.getElementById("Lcx");
-    const Rcx = document.getElementById("Rcx");
-    const Lc  = document.getElementById("Lc");
-    const Rc  = document.getElementById("Rc");
+  const L = document.getElementById("L");
+  const R = document.getElementById("R");
+  const Lf = document.getElementById("Lf");
+  const Rf = document.getElementById("Rf");
+  const Lb = document.getElementById("Lb");
+  const Ln = document.getElementById("Ln");
+  const Lt = document.getElementById("Lt");
+  const Rb = document.getElementById("Rb");
+  const Rn = document.getElementById("Rn");
+  const Rt = document.getElementById("Rt");
+  const Lcx = document.getElementById("Lcx");
+  const Rcx = document.getElementById("Rcx");
+  const Lc  = document.getElementById("Lc");
+  const Rc  = document.getElementById("Rc");
 
-    function countryLabel(side){
-  const raw = String(side?.country || "").trim();
-  if(!raw) return "";
-  const s = raw.toUpperCase();
+  const LdP = document.getElementById("LdP");
+  const RdP = document.getElementById("RdP");
+  const LdT = document.getElementById("LdT");
+  const RdT = document.getElementById("RdT");
 
-  // уже коротко (типа "СПБ", "BEL", "RUS")
-  if(s.length <= 3) return s;
-
-  // если несколько слов/через дефис — берем первые буквы
-  const parts = s.split(/[\s\-]+/).filter(Boolean);
-  if(parts.length >= 2){
-    const ab = parts.map(p => p[0]).join("").slice(0,3);
-    if(ab.length >= 2) return ab;
-  }
-
-  // иначе первые 3 символа (БЕЛАРУСЬ -> БЕЛ)
-  return s.slice(0,3);
-}
-
-    function pad2(n){ return String(n).padStart(2,"0"); }
-    function fmt(sec){
-      if(sec == null || Number.isNaN(sec)) return "0.000";
-      sec = Math.max(0, sec);
-      const ms = Math.round(sec*1000);
-      const s = Math.floor(ms/1000)%60;
-      const m = Math.floor(ms/60000)%60;
-      const h = Math.floor(ms/3600000);
-      const mm = ms%1000;
-      if(h>0) return `${h}:${pad2(m)}:${pad2(s)}.${String(mm).padStart(3,"0")}`;
-      if(ms>=60000) return `${m}:${pad2(s)}.${String(mm).padStart(3,"0")}`;
-      return (ms/1000).toFixed(3);
-    }
-
-    function compute(side, now){
-      if(!side || !side.bib) return 0;
-      if(side.finish != null) return side.finish;
-
-      const inPause = (side.paused_until_epoch != null && now < side.paused_until_epoch && side.paused_value != null);
-      if(inPause) return side.paused_value;
-
-      if(side.start_epoch != null) return now - side.start_epoch;
-      return 0;
-    }
-
-    function getStateUrl(){
+  // локальный фолбэк-переключатель (если сервер не прислал distance_enabled)
+  function parseShowDistance(){
+    try{
       const qs = new URLSearchParams(location.search);
-      const forced = qs.get("state");
-      if(forced) return forced;
-
-      if(location.origin && location.origin !== "null" && location.protocol.startsWith("http")){
-        return location.origin + "/state.json";
+      if(qs.has("dist")){
+        const v = qs.get("dist");
+        return !(v === "0" || v === "false" || v === "off");
       }
-      return "http://127.0.0.1:8099/state.json";
+      const ls = localStorage.getItem("overlayShowDistance");
+      if(ls != null) return ls === "1";
+    }catch(e){}
+    return true;
+  }
+  let showDistance = parseShowDistance();
+
+  function effectiveDistanceEnabled(){
+    // если сервер/приложение прислали флаг — он главный
+    if(state && typeof state.distance_enabled === "boolean"){
+      return state.distance_enabled;
     }
-    const BASE_STATE_URL = getStateUrl();
-
-    let FLAGS_ORIGIN = "";
-    try { FLAGS_ORIGIN = (new URL(BASE_STATE_URL)).origin; } catch(e) { FLAGS_ORIGIN = ""; }
-
-    function safeFlagName(s){
-      return String(s || "")
-        .trim()
-        .replace(/\\/g,"/")
-        .split("/").pop()
-        .replace(/[^\w.\-]/g,""); // латиница/цифры/_/.- (как на сервере)
-    }
-
-    function buildFlagFilename(side){
-      if(!side) return "";
-      if(side.flag){
-        return safeFlagName(side.flag);
-      }
-      if(side.country){
-        const code = safeFlagName(String(side.country).toUpperCase());
-        if(!code) return "";
-        return code.endsWith(".png") ? code : (code + ".png");
-      }
-      return "";
-    }
-
-    function setFlag(which, imgEl, side){
-      const fn = buildFlagFilename(side);
-      if(!fn){
-        imgEl.classList.add("hidden");
-        imgEl.removeAttribute("src");
-        lastFlag[which] = "";
-        return;
-      }
-      if(lastFlag[which] === fn) return;
-
-      lastFlag[which] = fn;
-      imgEl.classList.remove("hidden");
-      imgEl.src = (FLAGS_ORIGIN ? (FLAGS_ORIGIN + "/flags/") : "/flags/") + encodeURIComponent(fn);
-    }
-
-    Lf.addEventListener("error", ()=>{
-      Lf.classList.add("hidden");
-      Lf.removeAttribute("src");
-      lastFlag.L = "";
-    });
-    Rf.addEventListener("error", ()=>{
-      Rf.classList.add("hidden");
-      Rf.removeAttribute("src");
-      lastFlag.R = "";
-    });
-
-    async function poll(){
-      try{
-        const u = new URL(BASE_STATE_URL);
-        u.searchParams.set("_", String(Date.now()));
-        const res = await fetch(u.toString(), { cache:"no-store" });
-        if(res.ok){
-          state = await res.json();
-          lastOk = Date.now()/1000;
-        }
-      }catch(e){}
-      setTimeout(poll, 100);
-    }
-
-    function hideAll(){
-      wrap.classList.remove("on");
-      L.classList.add("hidden");
-      R.classList.add("hidden");
-      runEl.textContent = "Заезд: —";
-    }
-
-    function showWrap(){ wrap.classList.add("on"); }
-
-   function setCard(which, card, flagEl, ccBoxEl, ccEl, bibEl, nameEl, timeEl, side, now){
-  if(!side || !side.bib){
-    card.classList.add("hidden");
-    card.classList.remove("show","finished","split");
-    flagEl.classList.add("hidden");
-    ccBoxEl.classList.add("hidden");
-    ccEl.classList.add("hidden");
-    return false;
+    // иначе — локальный (через query/localStorage)
+    return showDistance;
   }
 
-  card.classList.remove("hidden");
-  requestAnimationFrame(()=>card.classList.add("show"));
+  function countryLabel(side){
+    const raw = String(side?.country || "").trim();
+    if(!raw) return "";
+    const s = raw.toUpperCase();
 
-  const finished = (side.finish != null);
+    if(s.length <= 3) return s;
 
-  const isSplitPause =
-    (!finished) &&
-    (side.paused_until_epoch != null) &&
-    (now < side.paused_until_epoch) &&
-    (side.paused_value != null);
-
-  card.classList.toggle("finished", finished);
-  card.classList.toggle("split", isSplitPause);
-
-  // флаг + подпись справа
-  setFlag(which, flagEl, side);
-
-  const lab = countryLabel(side);
-  if(lab){
-    ccEl.textContent = lab;
-    ccEl.classList.remove("hidden");
-  }else{
-    ccEl.textContent = "";
-    ccEl.classList.add("hidden");
+    const parts = s.split(/[\s\-]+/).filter(Boolean);
+    if(parts.length >= 2){
+      const ab = parts.map(p => p[0]).join("").slice(0,3);
+      if(ab.length >= 2) return ab;
+    }
+    return s.slice(0,3);
   }
 
-  const hasFlag = !!lastFlag[which]; // setFlag обновляет lastFlag
-  if(hasFlag || lab){
-    ccBoxEl.classList.remove("hidden");
-  }else{
-    ccBoxEl.classList.add("hidden");
+  function pad2(n){ return String(n).padStart(2,"0"); }
+  function fmt(sec){
+    if(sec == null || Number.isNaN(sec)) return "0.000";
+    sec = Math.max(0, sec);
+    const ms = Math.round(sec*1000);
+    const s = Math.floor(ms/1000)%60;
+    const m = Math.floor(ms/60000)%60;
+    const h = Math.floor(ms/3600000);
+    const mm = ms%1000;
+    if(h>0) return `${h}:${pad2(m)}:${pad2(s)}.${String(mm).padStart(3,"0")}`;
+    if(ms>=60000) return `${m}:${pad2(s)}.${String(mm).padStart(3,"0")}`;
+    return (ms/1000).toFixed(3);
   }
 
-  bibEl.textContent = side.bib;
-  nameEl.textContent = side.name || "";
+  function compute(side, now){
+    if(!side || !side.bib) return 0;
+    if(side.finish != null) return side.finish;
 
-  const t = fmt(compute(side, now));
-  if(lastShown[which] !== t){
-    timeEl.textContent = t;
-    timeEl.classList.remove("tick");
-    void timeEl.offsetWidth;
-    timeEl.classList.add("tick");
-    lastShown[which] = t;
+    const inPause = (side.paused_until_epoch != null && now < side.paused_until_epoch && side.paused_value != null);
+    if(inPause) return side.paused_value;
+
+    if(side.start_epoch != null) return now - side.start_epoch;
+    return 0;
   }
 
-  const inFreezeWindow = isSplitPause || finished;
-  if(inFreezeWindow && !lastFreezeFlag[which]){
-    timeEl.classList.remove("freeze");
-    void timeEl.offsetWidth;
-    timeEl.classList.add("freeze");
-    lastFreezeFlag[which] = true;
+  // --- дистанция ---
+  function getDistanceMeters(side){
+    if(!side || !side.bib) return null;
+
+    // если сервер уже посчитал — используем это
+    if(typeof side.distance_m === "number" && Number.isFinite(side.distance_m)) return side.distance_m;
+    if(typeof side.distance === "number" && Number.isFinite(side.distance)) return side.distance;
+    if(typeof side.distance_meters === "number" && Number.isFinite(side.distance_meters)) return side.distance_meters;
+
+    // иначе считаем из количества отсечек; финиш тоже считаем как +125м
+    let cnt = null;
+    if(typeof side.splits_count === "number") cnt = side.splits_count;
+    else if(typeof side.split_count === "number") cnt = side.split_count;
+    else if(typeof side.last_split_no === "number") cnt = side.last_split_no;
+    else if(typeof side.last_split === "number") cnt = side.last_split;
+    else if(side.splits && typeof side.splits === "object" && !Array.isArray(side.splits)) cnt = Object.keys(side.splits).length;
+    else if(Array.isArray(side.splits)) cnt = side.splits.length;
+
+    if(cnt == null) cnt = 0;
+
+    const extraFinish = (side.finish != null) ? 1 : 0;
+    const meters = (Math.max(0, cnt) + extraFinish) * 125;
+
+    if(!Number.isFinite(meters) || meters <= 0) return null;
+    return meters;
   }
-  if(!inFreezeWindow) lastFreezeFlag[which] = false;
 
-  return true;
-}
+  function fmtDist(m){
+    if(m == null || !Number.isFinite(m)) return "";
+    if(m >= 1000){
+      const km = m / 1000;
+      // 1250м -> 1.25 км, 2000м -> 2 км
+      let s = (Math.round(km*100)/100).toString();
+      // убираем .0 и .00
+      s = s.replace(/(\.\d*[1-9])0+$/,"$1").replace(/\.0+$/,"");
+      return `${s} км`;
+    }
+    return `${Math.round(m)} м`;
+  }
 
+  function setDist(pillEl, textEl, side, distEnabled){
+    if(!distEnabled || !side || !side.bib){
+      pillEl.classList.add("hidden");
+      pillEl.classList.remove("show");
+      return;
+    }
 
-    function render(){
-      const now = Date.now()/1000;
+    const dm = getDistanceMeters(side);
+    if(dm == null){
+      pillEl.classList.add("hidden");
+      pillEl.classList.remove("show");
+      return;
+    }
 
-      const staleByFetch = (!lastOk || (now - lastOk) > 0.7);
-      const staleByPayload = (state && typeof state.ts === "number" && (now - state.ts) > 0.7);
+    textEl.textContent = fmtDist(dm);
+    pillEl.classList.remove("hidden");
+    requestAnimationFrame(()=>pillEl.classList.add("show"));
+  }
+  // --- /дистанция ---
 
-      if(staleByFetch || staleByPayload){
-        hideAll();
-        requestAnimationFrame(render);
-        return;
+  function getStateUrl(){
+    const qs = new URLSearchParams(location.search);
+    const forced = qs.get("state");
+    if(forced) return forced;
+
+    if(location.origin && location.origin !== "null" && location.protocol.startsWith("http")){
+      return location.origin + "/state.json";
+    }
+    return "http://127.0.0.1:8099/state.json";
+  }
+  const BASE_STATE_URL = getStateUrl();
+
+  let FLAGS_ORIGIN = "";
+  try { FLAGS_ORIGIN = (new URL(BASE_STATE_URL)).origin; } catch(e) { FLAGS_ORIGIN = ""; }
+
+  function safeFlagName(s){
+    return String(s || "")
+      .trim()
+      .replace(/\\/g,"/")
+      .split("/").pop()
+      .replace(/[^\w.\-]/g,"");
+  }
+
+  function buildFlagFilename(side){
+    if(!side) return "";
+    if(side.flag) return safeFlagName(side.flag);
+
+    if(side.country){
+      const code = safeFlagName(String(side.country).toUpperCase());
+      if(!code) return "";
+      return code.endsWith(".png") ? code : (code + ".png");
+    }
+    return "";
+  }
+
+  function setFlag(which, imgEl, side){
+    const fn = buildFlagFilename(side);
+    if(!fn){
+      imgEl.classList.add("hidden");
+      imgEl.removeAttribute("src");
+      lastFlag[which] = "";
+      return;
+    }
+    if(lastFlag[which] === fn) return;
+
+    lastFlag[which] = fn;
+    imgEl.classList.remove("hidden");
+    imgEl.src = (FLAGS_ORIGIN ? (FLAGS_ORIGIN + "/flags/") : "/flags/") + encodeURIComponent(fn);
+  }
+
+  Lf.addEventListener("error", ()=>{
+    Lf.classList.add("hidden");
+    Lf.removeAttribute("src");
+    lastFlag.L = "";
+  });
+  Rf.addEventListener("error", ()=>{
+    Rf.classList.add("hidden");
+    Rf.removeAttribute("src");
+    lastFlag.R = "";
+  });
+
+  async function poll(){
+    try{
+      const u = new URL(BASE_STATE_URL);
+      u.searchParams.set("_", String(Date.now()));
+      const res = await fetch(u.toString(), { cache:"no-store" });
+      if(res.ok){
+        state = await res.json();
+        lastOk = Date.now()/1000;
       }
+    }catch(e){}
+    setTimeout(poll, 100);
+  }
 
-      showWrap();
+  function hideAll(){
+    wrap.classList.remove("on");
+    L.classList.add("hidden");
+    R.classList.add("hidden");
+    runEl.textContent = "Заезд: —";
 
-      const run = (state && state.run) ? state.run : "";
-      runEl.textContent = run ? `Заезд: ${run}` : "Заезд: —";
+    LdP.classList.add("hidden"); LdP.classList.remove("show");
+    RdP.classList.add("hidden"); RdP.classList.remove("show");
+  }
 
-      const left = state ? state.left : null;
-      const right = state ? state.right : null;
+  function showWrap(){ wrap.classList.add("on"); }
 
-      setCard("L", L, Lf, Lcx, Lc, Lb, Ln, Lt, left, now);
-      setCard("R", R, Rf, Rcx, Rc, Rb, Rn, Rt, right, now);
+  function setCard(which, card, flagEl, ccBoxEl, ccEl, bibEl, nameEl, timeEl, side, now){
+    if(!side || !side.bib){
+      card.classList.add("hidden");
+      card.classList.remove("show","finished","split");
+      flagEl.classList.add("hidden");
+      ccBoxEl.classList.add("hidden");
+      ccEl.classList.add("hidden");
+      return false;
+    }
 
+    card.classList.remove("hidden");
+    requestAnimationFrame(()=>card.classList.add("show"));
 
+    const finished = (side.finish != null);
+
+    const isSplitPause =
+      (!finished) &&
+      (side.paused_until_epoch != null) &&
+      (now < side.paused_until_epoch) &&
+      (side.paused_value != null);
+
+    card.classList.toggle("finished", finished);
+    card.classList.toggle("split", isSplitPause);
+
+    setFlag(which, flagEl, side);
+
+    const lab = countryLabel(side);
+    if(lab){
+      ccEl.textContent = lab;
+      ccEl.classList.remove("hidden");
+    }else{
+      ccEl.textContent = "";
+      ccEl.classList.add("hidden");
+    }
+
+    const hasFlag = !!lastFlag[which];
+    if(hasFlag || lab){
+      ccBoxEl.classList.remove("hidden");
+    }else{
+      ccBoxEl.classList.add("hidden");
+    }
+
+    bibEl.textContent = side.bib;
+    nameEl.textContent = side.name || "";
+
+    const t = fmt(compute(side, now));
+    if(lastShown[which] !== t){
+      timeEl.textContent = t;
+      timeEl.classList.remove("tick");
+      void timeEl.offsetWidth;
+      timeEl.classList.add("tick");
+      lastShown[which] = t;
+    }
+
+    const inFreezeWindow = isSplitPause || finished;
+    if(inFreezeWindow && !lastFreezeFlag[which]){
+      timeEl.classList.remove("freeze");
+      void timeEl.offsetWidth;
+      timeEl.classList.add("freeze");
+      lastFreezeFlag[which] = true;
+    }
+    if(!inFreezeWindow) lastFreezeFlag[which] = false;
+
+    return true;
+  }
+
+  function render(){
+    const now = Date.now()/1000;
+
+    const staleByFetch = (!lastOk || (now - lastOk) > 0.7);
+    const staleByPayload = (state && typeof state.ts === "number" && (now - state.ts) > 0.7);
+
+    if(staleByFetch || staleByPayload){
+      hideAll();
       requestAnimationFrame(render);
+      return;
     }
 
-    poll();
+    showWrap();
+
+    const run = (state && state.run) ? state.run : "";
+    runEl.textContent = run ? `Заезд: ${run}` : "Заезд: —";
+
+    const left = state ? state.left : null;
+    const right = state ? state.right : null;
+
+    setCard("L", L, Lf, Lcx, Lc, Lb, Ln, Lt, left, now);
+    setCard("R", R, Rf, Rcx, Rc, Rb, Rn, Rt, right, now);
+
+    const distEnabled = effectiveDistanceEnabled();
+    setDist(LdP, LdT, left, distEnabled);
+    setDist(RdP, RdT, right, distEnabled);
+
     requestAnimationFrame(render);
+  }
+
+  poll();
+  requestAnimationFrame(render);
 </script>
 </body>
 </html>

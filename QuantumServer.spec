@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['main.py'],
+    ['main_updated.py'],
     pathex=[],
     binaries=[],
     datas=[('overlay_test.html', '.'), ('flags', 'flags')],
