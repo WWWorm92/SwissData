@@ -11,6 +11,7 @@
 #     {"type":"state","state":{...}}  where state is MeetModel._model_to_state()
 
 import argparse
+import copy
 import csv
 import datetime
 import json
@@ -316,6 +317,41 @@ def run_distance_m(run: Dict[str, Any]) -> Optional[int]:
                     dm = _parse_distance_m(v.get(k))
                     if dm:
                         return dm
+
+    # Fallback inference from passed checkpoints (when explicit distance is absent).
+    # We infer only if at least one athlete has finish, because mid-race split count
+    # does not reliably indicate final planned distance.
+    ath = run.get("athletes")
+    if isinstance(ath, dict) and ath:
+        has_finish = False
+        max_split = 0
+
+        for _bib, a in ath.items():
+            if not isinstance(a, dict):
+                continue
+            if a.get("finish") is not None:
+                has_finish = True
+
+            sp = a.get("splits")
+            if isinstance(sp, dict):
+                for k in sp.keys():
+                    m = re.search(r"\d+", str(k))
+                    if not m:
+                        continue
+                    try:
+                        n = int(m.group(0))
+                    except Exception:
+                        continue
+                    if n > max_split:
+                        max_split = n
+            elif isinstance(sp, (list, tuple)):
+                if len(sp) > max_split:
+                    max_split = len(sp)
+
+        if has_finish:
+            # checkpoints include finish => distance = checkpoints * 125m
+            checkpoints = max_split + 1 if max_split > 0 else 1
+            return checkpoints * DIST_PER_SPLIT_M
     return None
 
 
@@ -786,6 +822,7 @@ class App(tk.Tk):
         self.protocol_type_var = tk.StringVar(value="Произвольно")
         self.protocol_event_var = tk.StringVar(value="")
         self.protocol_round_var = tk.StringVar(value="")
+        self.protocol_suggest_var = tk.StringVar(value="—")
         self.secretary_var = tk.StringVar(value=self.settings.secretary_name)
         self.chief_judge_var = tk.StringVar(value=self.settings.chief_judge_name)
         self.protocol_mode_var = tk.StringVar(value=self.settings.protocol_mode or "time")
@@ -796,6 +833,8 @@ class App(tk.Tk):
         self.protocol_conditions_var = tk.StringVar(value=self.settings.protocol_conditions)
 
         self.protocol_scope_var = tk.StringVar(value="all")  # all | filter | selected
+        self._protocol_suggestion: Optional[Dict[str, Any]] = None
+        self._protocol_rejected: Dict[str, str] = {}
 
         self._build_style()
         self._build_ui()
@@ -848,6 +887,7 @@ class App(tk.Tk):
         style.configure("BarH2.TLabel", background=panel, foreground=fg, font=("Segoe UI", 13, "bold"))
         style.configure("H1.TLabel", background=bg, foreground=fg, font=("Segoe UI", 16, "bold"))
         style.configure("H2.TLabel", background=bg, foreground=fg, font=("Segoe UI", 13, "bold"))
+        style.configure("Hint.TLabel", background=bg, foreground=muted, font=("Segoe UI", 10))
 
         style.configure("TButton", background=panel, foreground=fg, borderwidth=0, padding=(12, 9))
         style.map("TButton", background=[("active", self.colors["head"]), ("pressed", self.colors["select"])])
@@ -858,10 +898,18 @@ class App(tk.Tk):
         style.configure("TEntry", fieldbackground=panel2, foreground=fg)
         style.configure("TCombobox", fieldbackground=panel2, background=panel2, foreground=fg, arrowcolor=fg)
 
-        style.configure("Treeview", background=panel2, fieldbackground=panel2, foreground=fg, rowheight=34, borderwidth=1, relief="solid")
+        style.configure("Treeview", background=panel2, fieldbackground=panel2, foreground=fg, rowheight=36, borderwidth=1, relief="solid")
         style.map("Treeview", background=[("selected", self.colors["select"])], foreground=[("selected", fg)])
         style.configure("Treeview.Heading", background=self.colors["head"], foreground=fg, relief="flat",
-                        font=("Segoe UI", 11, "bold"), padding=(10, 10))
+                        font=("Segoe UI", 12, "bold"), padding=(10, 10))
+        style.map("Treeview.Heading",
+                  background=[("active", self.colors["head"]), ("pressed", self.colors["select"])],
+                  foreground=[("active", fg), ("pressed", fg)])
+        style.configure("TNotebook", background=bg, borderwidth=0)
+        style.configure("TNotebook.Tab", background=panel, foreground=fg, padding=(14, 8), borderwidth=0)
+        style.map("TNotebook.Tab",
+                  background=[("selected", self.colors["head"]), ("active", self.colors["head"])],
+                  foreground=[("selected", fg), ("active", fg)])
 
     def _build_ui(self):
         c = self.colors
@@ -942,14 +990,24 @@ class App(tk.Tk):
         ttk.Entry(ctrl_in, textvariable=self.run_filter_var).pack(side="left", fill="x", expand=True, padx=(8, 12))
         self.run_filter_var.trace_add("write", lambda *_: (self._render_runs(), self._render_runs_table_text()))
 
+        ttk.Label(ctrl_in, text="Участник", style="Muted.TLabel").pack(side="left")
+        ttk.Entry(ctrl_in, textvariable=self.ath_filter_var, width=22).pack(side="left", padx=(8, 12))
+        self.ath_filter_var.trace_add("write", lambda *_: (self._render_runs(), self._render_runs_table_text()))
+
         ttk.Label(ctrl_in, text="Категория заезда", style="Muted.TLabel").pack(side="left")
         self.run_info_var = tk.StringVar(value="—")
         self.run_cat_cb = ttk.Combobox(ctrl_in, textvariable=self.run_category_var, values=self.settings.categories, state="readonly", width=22)
         self.run_cat_cb.pack(side="left", padx=(8, 12))
         self.run_cat_cb.bind("<<ComboboxSelected>>", lambda _e: self._on_run_category_changed())
 
+        ttk.Button(ctrl_in, text="Сбросить фильтры", command=self._clear_run_filters).pack(side="right", padx=(0, 8))
         ttk.Button(ctrl_in, text="Загрузить состав…", command=self._load_roster_for_current_category).pack(side="right")
         ttk.Button(ctrl_in, text="Экспорт заезда…", command=self._export_selected_run).pack(side="right", padx=(0, 8))
+
+        info_row = ttk.Frame(outer, style="TFrame")
+        info_row.pack(fill="x", pady=(8, 0))
+        ttk.Label(info_row, textvariable=self.run_info_var, style="Muted.TLabel").pack(side="left")
+        ttk.Label(info_row, text="Подсказка: Ctrl+C копирует выделение в таблице/дереве", style="Hint.TLabel").pack(side="right")
 
         # Views: table (Excel-like selectable text) + tree
         view_nb = ttk.Notebook(outer)
@@ -1053,6 +1111,12 @@ class App(tk.Tk):
             view_nb.select(self.runs_tab_table)
         except Exception:
             pass
+
+    def _clear_run_filters(self):
+        self.run_filter_var.set("")
+        self.ath_filter_var.set("")
+        self._render_runs()
+        self._render_runs_table_text()
 
     def _build_roster_tab(self):
         c = self.colors
@@ -1167,13 +1231,13 @@ class App(tk.Tk):
 
         types = [
             "Произвольно",
+            "Гит 125 м с места",
             "Гит 250 м с места",
             "Гит 500 м с места",
-            "Спринт (квалификация)",
-            "Спринт (заезд)",
-            "Скретч",
-            "Кейрин",
-            "Командный спринт",
+            "Гит 1000 м с места",
+            "Гонка преследования 2 км",
+            "Гонка преследования 3 км",
+            "Гонка преследования 4 км",
         ]
 
         ttk.Label(pad, text="Тип", style="Muted.TLabel").grid(row=1, column=0, sticky="w", pady=(10, 0))
@@ -1221,8 +1285,16 @@ class App(tk.Tk):
         ttk.Radiobutton(scope, text="выделенные в дереве", value="selected", variable=self.protocol_scope_var, command=self._update_protocol_preview).pack(side="left", padx=(10, 0))
         ttk.Button(btns, text="Копировать", style="Accent.TButton", command=self._copy_protocol_text).pack(side="left")
         ttk.Button(btns, text="TXT…", command=self._save_protocol_txt).pack(side="left", padx=(8, 0))
+        ttk.Button(btns, text="XLSX…", command=self._save_protocol_xlsx_template).pack(side="left", padx=(8, 0))
         ttk.Button(btns, text="DOCX…", command=self._save_protocol_docx).pack(side="left", padx=(8, 0))
         ttk.Button(btns, text="Папка…", command=self._save_protocol_docx_folder).pack(side="left", padx=(8, 0))
+
+        ttk.Label(pad, text="Автоподсказка", style="Muted.TLabel").grid(row=6, column=0, sticky="w", pady=(10, 0))
+        ttk.Label(pad, textvariable=self.protocol_suggest_var, style="Muted.TLabel").grid(row=6, column=1, columnspan=5, sticky="w", padx=(8, 14), pady=(10, 0))
+        sug_btns = ttk.Frame(pad, style="Card.TFrame")
+        sug_btns.grid(row=6, column=6, columnspan=2, sticky="e", pady=(10, 0))
+        ttk.Button(sug_btns, text="Принять", command=self._apply_protocol_suggestion).pack(side="left")
+        ttk.Button(sug_btns, text="Отклонить", command=self._reject_protocol_suggestion).pack(side="left", padx=(8, 0))
 
         for v in (
             self.protocol_event_var,
@@ -1249,6 +1321,119 @@ class App(tk.Tk):
         if t and t != "Произвольно" and not self.protocol_event_var.get().strip():
             self.protocol_event_var.set(t)
         self._update_protocol_preview()
+
+    def _run_checkpoint_count(self, run: Dict[str, Any]) -> int:
+        split_ids = self._run_split_ids(run)
+        split_count = len(split_ids)
+        has_finish = False
+        ath = run.get("athletes")
+        if isinstance(ath, dict):
+            for _bib, a in ath.items():
+                if isinstance(a, dict) and a.get("finish") is not None:
+                    has_finish = True
+                    break
+        if split_count == 0 and has_finish:
+            return 1
+        return split_count + (1 if has_finish else 0)
+
+    def _detect_protocol_discipline(self, run_key: str, run: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        dm = run_distance_m(run)
+        by_distance = {
+            125: "Гит 125 м с места",
+            250: "Гит 250 м с места",
+            500: "Гит 500 м с места",
+            1000: "Гит 1000 м с места",
+            2000: "Гонка преследования 2 км",
+            3000: "Гонка преследования 3 км",
+            4000: "Гонка преследования 4 км",
+        }
+        if dm in by_distance:
+            typ = by_distance[dm]
+            return {
+                "run_key": run_key,
+                "type": typ,
+                "event": typ,
+                "distance_m": dm,
+                "checkpoints": self._run_checkpoint_count(run),
+                "signature": f"d:{dm}",
+                "reason": "по дистанции",
+            }
+
+        checkpoints = self._run_checkpoint_count(run)
+        by_checkpoints = {
+            1: ("Гит 125 м с места", 125),
+            2: ("Гит 250 м с места", 250),
+            4: ("Гит 500 м с места", 500),
+            8: ("Гит 1000 м с места", 1000),
+            16: ("Гонка преследования 2 км", 2000),
+            24: ("Гонка преследования 3 км", 3000),
+            32: ("Гонка преследования 4 км", 4000),
+        }
+        if checkpoints in by_checkpoints:
+            typ, dm2 = by_checkpoints[checkpoints]
+            return {
+                "run_key": run_key,
+                "type": typ,
+                "event": typ,
+                "distance_m": dm2,
+                "checkpoints": checkpoints,
+                "signature": f"c:{checkpoints}",
+                "reason": "по числу отсечек",
+            }
+        return None
+
+    def _update_protocol_suggestion(self):
+        runs = self.state.get("runs", {}) if isinstance(self.state.get("runs"), dict) else {}
+        run_key = self.selected_run_key or self.state.get("current_key")
+        run = runs.get(run_key) if run_key and isinstance(runs.get(run_key), dict) else None
+        if not run_key or not run:
+            self._protocol_suggestion = None
+            self.protocol_suggest_var.set("—")
+            return
+
+        sug = self._detect_protocol_discipline(str(run_key), run)
+        if not sug:
+            self._protocol_suggestion = None
+            self.protocol_suggest_var.set("не удалось определить дисциплину автоматически")
+            return
+
+        sig = str(sug.get("signature") or "")
+        if self._protocol_rejected.get(str(run_key)) == sig:
+            self._protocol_suggestion = None
+            self.protocol_suggest_var.set("подсказка отклонена (можно выбрать вручную)")
+            return
+
+        self._protocol_suggestion = sug
+        self.protocol_suggest_var.set(
+            f"{sug.get('type')} — {sug.get('checkpoints')} отсечек (включая финиш), {sug.get('reason')}"
+        )
+
+    def _apply_protocol_suggestion(self):
+        sug = self._protocol_suggestion
+        if not sug:
+            return
+        typ = str(sug.get("type") or "").strip()
+        if typ:
+            self.protocol_type_var.set(typ)
+            self.protocol_event_var.set(str(sug.get("event") or typ))
+            self._update_protocol_preview()
+
+    def _reject_protocol_suggestion(self):
+        sug = self._protocol_suggestion
+        run_key = self.selected_run_key or self.state.get("current_key")
+        if sug and run_key:
+            self._protocol_rejected[str(run_key)] = str(sug.get("signature") or "")
+        self._protocol_suggestion = None
+        self.protocol_suggest_var.set("подсказка отклонена (можно выбрать вручную)")
+
+    def _effective_protocol_type_for_run(self, run_key: str, run: Dict[str, Any]) -> str:
+        t = (self.protocol_type_var.get() or "").strip()
+        if t and t != "Произвольно":
+            return t
+        sug = self._detect_protocol_discipline(run_key, run)
+        if sug:
+            return str(sug.get("type") or "")
+        return t
 
     def _protocol_sort_rows(self, run_key: str, run: Dict[str, Any]) -> List[Dict[str, Any]]:
         ath = run.get("athletes") or {}
@@ -1294,9 +1479,10 @@ class App(tk.Tk):
     def _build_protocol_text(self, run_key: str, run: Dict[str, Any]) -> str:
         cat = self.settings.run_categories.get(run_key, "") or self.run_category_var.get().strip() or self.category_var.get().strip()
         start = run.get("start_time") or ""
+        proto_type_eff = self._effective_protocol_type_for_run(run_key, run)
         ev = str(run.get("event") or run.get("discipline") or run.get("name") or "").strip()
         if not ev:
-            ev = self.protocol_event_var.get().strip() or self.protocol_type_var.get().strip()
+            ev = self.protocol_event_var.get().strip() or proto_type_eff
         rnd = str(run.get("round") or run.get("phase") or run.get("heat") or "").strip()
         if not rnd:
             rnd = self.protocol_round_var.get().strip()
@@ -1384,6 +1570,15 @@ class App(tk.Tk):
             if isinstance(v, dict):
                 items.append((str(k), v))
 
+        def _parse_run_key_num(k: str) -> Optional[Tuple[int, int]]:
+            m = re.match(r"^\s*(\d+)\s*[-:]\s*(\d+)\s*$", str(k))
+            if not m:
+                return None
+            try:
+                return (int(m.group(1)), int(m.group(2)))
+            except Exception:
+                return None
+
         def _parse_start_ts(x: Any) -> Optional[float]:
             if x is None:
                 return None
@@ -1402,25 +1597,29 @@ class App(tk.Tk):
         def _sort_key(item: Tuple[str, Dict[str, Any]]):
             k, run = item
 
+            rk = _parse_run_key_num(k)
+            if rk is not None:
+                return (0, rk[0], rk[1])
+
             for fld in ("order", "seq", "index", "heat", "run_no", "number"):
                 if fld in run:
                     try:
-                        return (0, int(run.get(fld)))
+                        return (1, int(run.get(fld)))
                     except Exception:
                         pass
 
             ts = _parse_start_ts(run.get("start_ts") or run.get("start_time") or run.get("start") or run.get("ts"))
             if ts is not None:
-                return (1, ts)
+                return (2, ts)
 
             num = safe_int_str(k)
             if num:
                 try:
-                    return (2, int(num))
+                    return (3, int(num))
                 except Exception:
                     pass
 
-            return (3, k)
+            return (4, k)
 
         items.sort(key=_sort_key)
         return items
@@ -1540,6 +1739,333 @@ class App(tk.Tk):
         txt = self._build_all_protocol_text()
         Path(path).write_text(txt, encoding="utf-8")
         messagebox.showinfo("Готово", f"Сохранено: {path}")
+
+    def _resolve_protocol_template_path(self) -> Optional[Path]:
+        candidates = [
+            Path.cwd() / "протокол.xlsx",
+            Path(__file__).resolve().parent / "протокол.xlsx",
+        ]
+        for p in candidates:
+            if p.exists() and p.is_file():
+                return p
+
+        picked = filedialog.askopenfilename(
+            title="Выбери шаблон протокола",
+            filetypes=[("Excel", "*.xlsx"), ("All", "*.*")],
+        )
+        if not picked:
+            return None
+        p = Path(picked)
+        return p if p.exists() and p.is_file() else None
+
+    def _discipline_distance_from_type(self, proto_type: str) -> Optional[int]:
+        t = (proto_type or "").strip().lower()
+        mapping = {
+            "гит 125 м с места": 125,
+            "гит 250 м с места": 250,
+            "гит 500 м с места": 500,
+            "гит 1000 м с места": 1000,
+            "гонка преследования 2 км": 2000,
+            "гонка преследования 3 км": 3000,
+            "гонка преследования 4 км": 4000,
+        }
+        return mapping.get(t)
+
+    def _checkpoint_plan_for_run(self, run_key: str, run: Dict[str, Any]) -> Dict[str, Any]:
+        run_proto_type = self._effective_protocol_type_for_run(run_key, run)
+        distance_m = self._discipline_distance_from_type(run_proto_type)
+        if distance_m is None:
+            distance_m = run_distance_m(run)
+
+        checkpoints = self._run_checkpoint_count(run)
+        if distance_m:
+            checkpoints = max(1, int(round(distance_m / DIST_PER_SPLIT_M)))
+        else:
+            distance_m = checkpoints * DIST_PER_SPLIT_M if checkpoints > 0 else None
+
+        labels: List[str] = []
+        for i in range(1, checkpoints + 1):
+            if i == 1:
+                labels.append(f"{DIST_PER_SPLIT_M} м")
+            else:
+                a = DIST_PER_SPLIT_M * (i - 1)
+                b = DIST_PER_SPLIT_M * i
+                labels.append(f"{a}-{b}м")
+        return {
+            "type": run_proto_type,
+            "distance_m": distance_m,
+            "checkpoints": checkpoints,
+            "labels": labels,
+        }
+
+    def _rows_for_protocol_xlsx(self, run_key: str, run: Dict[str, Any], checkpoints: int, distance_m: Optional[int]) -> List[Dict[str, Any]]:
+        ath = run.get("athletes") or {}
+        order = run.get("bib_order")
+        if isinstance(order, list) and order:
+            bibs = [safe_int_str(b) for b in order if safe_int_str(b)]
+        else:
+            bibs = [safe_int_str(b) for b in (ath.keys() if isinstance(ath, dict) else [])]
+        bibs = [b for b in bibs if b and b in ath]
+
+        split_ids = self._run_split_ids(run)
+
+        rows: List[Dict[str, Any]] = []
+        for idx, bib in enumerate(bibs):
+            a = ath.get(bib)
+            if not isinstance(a, dict):
+                continue
+
+            meta = self._effective_meta_full(run_key, a)
+            finish = a.get("finish")
+            status = str(a.get("status") or "").strip()
+
+            fin_f = None
+            try:
+                fin_f = float(finish) if finish is not None else None
+            except Exception:
+                fin_f = None
+
+            cp_vals: List[str] = []
+            splits = a.get("splits")
+            split_map: Dict[str, Any] = {}
+            if isinstance(splits, dict):
+                split_map = {str(k): v for k, v in splits.items()}
+            elif isinstance(splits, (list, tuple)):
+                split_map = {str(i + 1): v for i, v in enumerate(splits)}
+
+            cumulative_vals: List[Optional[float]] = []
+            for i_cp in range(1, checkpoints + 1):
+                if i_cp == checkpoints:
+                    cumulative_vals.append(fin_f)
+                    continue
+                val = None
+                if i_cp - 1 < len(split_ids):
+                    sid = str(split_ids[i_cp - 1])
+                    try:
+                        sv = split_map.get(sid)
+                        val = float(sv) if sv is not None else None
+                    except Exception:
+                        val = None
+                cumulative_vals.append(val)
+
+            prev_val = 0.0
+            for i_cp in range(checkpoints):
+                cur = cumulative_vals[i_cp] if i_cp < len(cumulative_vals) else None
+                seg = None
+                if cur is not None:
+                    if i_cp == 0:
+                        seg = cur
+                    elif prev_val is not None:
+                        seg = cur - prev_val
+                    prev_val = cur
+                else:
+                    prev_val = None
+                cp_vals.append(fmt_sec_ru(seg) if seg is not None else "")
+
+            rows.append({
+                "idx": idx,
+                "bib": bib,
+                "meta": meta,
+                "finish_f": fin_f,
+                "finish": fmt_sec_ru(fin_f) if fin_f is not None else "",
+                "status": status,
+                "checkpoints": cp_vals,
+                "speed": fmt_speed_kmh_ru(distance_m, fin_f) if fin_f is not None else "",
+            })
+
+        rows.sort(key=lambda r: (r["finish_f"] is None, r["finish_f"] if r["finish_f"] is not None else 0.0, r["idx"]))
+
+        place = 0
+        for r in rows:
+            st_u = (r.get("status") or "").strip().upper()
+            if r.get("finish_f") is not None and st_u not in ("DNS",):
+                place += 1
+                r["place"] = str(place)
+            else:
+                r["place"] = ""
+
+        return rows
+
+    def _write_protocol_template_xlsx(self, template_path: Path, out_path: Path, items: List[Tuple[str, Dict[str, Any]]]):
+        wb = load_workbook(str(template_path))
+        ws = wb.active
+
+        template_top = 1
+        template_bottom = 25
+        template_height = template_bottom - template_top + 1
+        template_max_col = 11
+
+        plans: List[Dict[str, Any]] = []
+        max_checkpoints = 1
+        for run_key, run in items:
+            p = self._checkpoint_plan_for_run(run_key, run)
+            plans.append(p)
+            try:
+                max_checkpoints = max(max_checkpoints, int(p.get("checkpoints") or 1))
+            except Exception:
+                pass
+
+        block_max_col = 7 + max_checkpoints + 2
+
+        def _copy_block(dst_top: int):
+            for r_off in range(template_height):
+                src_r = template_top + r_off
+                dst_r = dst_top + r_off
+
+                src_dim = ws.row_dimensions.get(src_r)
+                dst_dim = ws.row_dimensions[dst_r]
+                if src_dim and src_dim.height is not None:
+                    dst_dim.height = src_dim.height
+
+                for c in range(1, block_max_col + 1):
+                    src_c = c if c <= template_max_col else template_max_col
+                    src = ws.cell(src_r, src_c)
+                    dst = ws.cell(dst_r, c)
+                    dst.value = src.value if c <= template_max_col else None
+                    dst.number_format = src.number_format
+                    dst.font = copy.copy(src.font)
+                    dst.fill = copy.copy(src.fill)
+                    dst.border = copy.copy(src.border)
+                    dst.alignment = copy.copy(src.alignment)
+                    dst.protection = copy.copy(src.protection)
+
+            merges = list(ws.merged_cells.ranges)
+            for rng in merges:
+                if rng.min_row >= template_top and rng.max_row <= template_bottom:
+                    dr = dst_top - template_top
+                    shifted = copy.copy(rng)
+                    shifted.shift(row_shift=dr, col_shift=0)
+                    try:
+                        ws.merge_cells(str(shifted))
+                    except Exception:
+                        pass
+
+        needed_rows = template_height * len(items)
+        if ws.max_row < needed_rows:
+            ws.insert_rows(ws.max_row + 1, amount=(needed_rows - ws.max_row))
+
+        for i_item in range(1, len(items)):
+            _copy_block(1 + i_item * template_height)
+
+        for i_item, (run_key, run) in enumerate(items):
+            block_top = 1 + i_item * template_height
+            plan = plans[i_item]
+            run_proto_type = str(plan.get("type") or "")
+            checkpoints = int(plan.get("checkpoints") or 1)
+            labels = list(plan.get("labels") or [])
+            distance_m = plan.get("distance_m")
+
+            ev = str(run.get("event") or run.get("discipline") or run.get("name") or "").strip()
+            if not ev:
+                ev = self.protocol_event_var.get().strip() or run_proto_type or "ПРОТОКОЛ"
+
+            stage = str(run.get("round") or run.get("phase") or run.get("heat") or "").strip()
+            if not stage:
+                stage = self.protocol_round_var.get().strip() or f"Заезд {run_key}"
+
+            date_line = (self.protocol_date_var.get() or "").strip()
+            if not date_line:
+                st = str(run.get("start_time") or run.get("start") or "").strip()
+                if st:
+                    try:
+                        s2 = st.replace("Z", "+00:00")
+                        dt = datetime.datetime.fromisoformat(s2)
+                        date_line = fmt_ru_long_date(dt.date())
+                    except Exception:
+                        pass
+
+            conditions = (self.protocol_conditions_var.get() or "").strip()
+
+            ws.cell(row=block_top + 0, column=1, value=(ev or "ПРОТОКОЛ").upper())
+            ws.cell(row=block_top + 1, column=1, value=stage)
+            ws.cell(row=block_top + 2, column=1, value="РЕЗУЛЬТАТЫ")
+            ws.cell(row=block_top + 3, column=1, value=date_line)
+            ws.cell(row=block_top + 4, column=1, value=conditions)
+
+            hdr_row = block_top + 5
+            base_headers = ["Место", "№\nг-ка", "Фамилия  Имя Отчество", "Организация", "Дата\nРождения", "Разряд", "Регион"]
+            for j, h in enumerate(base_headers, start=1):
+                ws.cell(row=hdr_row, column=j, value=h)
+
+            split_col_start = 8
+            split_col_end = split_col_start + max_checkpoints - 1
+            for j in range(split_col_start, split_col_end + 1):
+                ws.cell(row=hdr_row, column=j, value=None)
+
+            for j, lab in enumerate(labels, start=split_col_start):
+                ws.cell(row=hdr_row, column=j, value=lab)
+
+            result_col = split_col_start + checkpoints
+            speed_col = result_col + 1
+            ws.cell(row=hdr_row, column=result_col, value="Результ\nтат")
+            ws.cell(row=hdr_row, column=speed_col, value="Ср.ск\nть")
+
+            rows = self._rows_for_protocol_xlsx(run_key, run, checkpoints=checkpoints, distance_m=distance_m)
+            data_start = block_top + 7
+            data_end = block_top + 24
+
+            for rr_i in range(data_start, data_end + 1):
+                for c in range(1, block_max_col + 1):
+                    ws.cell(row=rr_i, column=c, value=None)
+
+            for i_row, rr in enumerate(rows):
+                row_idx = data_start + i_row
+                if row_idx > data_end:
+                    break
+                meta = rr.get("meta") or {}
+                values = [
+                    rr.get("place", ""),
+                    rr.get("bib", ""),
+                    meta.get("name", ""),
+                    meta.get("org", ""),
+                    meta.get("dob", ""),
+                    meta.get("rank", ""),
+                    (meta.get("region") or meta.get("country") or ""),
+                ]
+                values.extend(rr.get("checkpoints") or [""] * checkpoints)
+                values.append(rr.get("finish", "") if rr.get("finish") else (rr.get("status") or ""))
+                values.append(rr.get("speed", ""))
+
+                for j, v in enumerate(values, start=1):
+                    ws.cell(row=row_idx, column=j, value=v)
+
+        wb.save(str(out_path))
+
+    def _save_protocol_xlsx_template(self):
+        if load_workbook is None:
+            messagebox.showerror("Ошибка", "openpyxl не установлен")
+            return
+
+        items = self._get_protocol_items_scoped()
+        if not items:
+            messagebox.showerror("Ошибка", "Нет данных по заездам")
+            return
+
+        template_path = self._resolve_protocol_template_path()
+        if not template_path:
+            return
+
+        def _safe_name(s: str) -> str:
+            s = (s or "").strip()
+            if not s:
+                return "protocol"
+            s = re.sub(r"[\\/:*?\"<>|]+", "_", s)
+            s = re.sub(r"\s+", " ", s).strip()
+            return s[:120] if len(s) > 120 else s
+
+        path = filedialog.asksaveasfilename(
+            defaultextension=".xlsx",
+            filetypes=[("Excel", "*.xlsx")],
+            initialfile=_safe_name("protocol_all") + ".xlsx",
+        )
+        if not path:
+            return
+
+        try:
+            self._write_protocol_template_xlsx(template_path, Path(path), items)
+            messagebox.showinfo("Готово", f"Сохранено: {path}")
+        except Exception as e:
+            messagebox.showerror("Ошибка", str(e))
 
     def _docx_setup_page(self, doc):
         """Best-effort page setup for wide protocols."""
@@ -1920,9 +2446,11 @@ class App(tk.Tk):
             cat = self.settings.run_categories.get(run_key, "") or self.run_category_var.get().strip() or self.category_var.get().strip()
             start = run.get("start_time") or ""
 
+            run_proto_type = self._effective_protocol_type_for_run(run_key, run)
+
             ev = str(run.get("event") or run.get("discipline") or run.get("name") or "").strip()
             if not ev:
-                ev = self.protocol_event_var.get().strip() or self.protocol_type_var.get().strip()
+                ev = self.protocol_event_var.get().strip() or run_proto_type
 
             rnd = str(run.get("round") or run.get("phase") or run.get("heat") or "").strip()
             if not rnd:
@@ -1930,7 +2458,7 @@ class App(tk.Tk):
 
             dm = run_distance_m(run)
 
-            if proto_type == "Гит 250 м с места":
+            if run_proto_type == "Гит 250 м с места":
                 ev_title = self.protocol_event_var.get().strip() or "ГИТ 250 м с/м"
                 stage = self.protocol_round_var.get().strip() or rnd
                 self._docx_git250_page(
@@ -2087,9 +2615,11 @@ class App(tk.Tk):
             cat = self.settings.run_categories.get(run_key, "") or self.run_category_var.get().strip() or self.category_var.get().strip()
             start = run.get("start_time") or ""
 
+            run_proto_type = self._effective_protocol_type_for_run(run_key, run)
+
             ev = str(run.get("event") or run.get("discipline") or run.get("name") or "").strip()
             if not ev:
-                ev = self.protocol_event_var.get().strip() or self.protocol_type_var.get().strip()
+                ev = self.protocol_event_var.get().strip() or run_proto_type
 
             rnd = str(run.get("round") or run.get("phase") or run.get("heat") or "").strip()
             if not rnd:
@@ -2097,7 +2627,7 @@ class App(tk.Tk):
 
             dm = run_distance_m(run)
 
-            if proto_type == "Гит 250 м с места":
+            if run_proto_type == "Гит 250 м с места":
                 ev_title = self.protocol_event_var.get().strip() or "ГИТ 250 м с/м"
                 stage = self.protocol_round_var.get().strip() or rnd
                 self._docx_git250_page(
@@ -2185,7 +2715,7 @@ class App(tk.Tk):
                                 sp.append(f"S{sid}:{fmt_time(splits.get(str(sid)))}")
                         cells[-1].text = " ".join(sp)
 
-            base = f"{proto_type or 'protocol'}_{run_key}" if proto_type else f"protocol_{run_key}"
+            base = f"{run_proto_type or 'protocol'}_{run_key}" if run_proto_type else f"protocol_{run_key}"
             filename = _safe_name(base) + ".docx"
             out_path = str(Path(folder) / filename)
             try:
@@ -2258,9 +2788,56 @@ class App(tk.Tk):
             st = msg.get("state")
             if isinstance(st, dict):
                 self.state = st
+                self._sync_categories_from_state(st)
                 self._last_state_ts = time.time()
                 self._refresh_views()
                 return
+
+    def _sync_categories_from_state(self, st: Dict[str, Any]):
+        try:
+            raw = st.get("categories")
+            cats: List[str] = []
+            seen = set()
+            if isinstance(raw, list):
+                for x in raw:
+                    s = str(x or "").strip()
+                    if not s or s in seen:
+                        continue
+                    seen.add(s)
+                    cats.append(s)
+
+            runs = st.get("runs")
+            if isinstance(runs, dict):
+                for rk, run in runs.items():
+                    if not isinstance(run, dict):
+                        continue
+                    cat = str(run.get("category") or "").strip()
+                    if cat:
+                        self.settings.run_categories[str(rk)] = cat
+                        if cat not in seen:
+                            seen.add(cat)
+                            cats.append(cat)
+
+            if cats:
+                self.settings.categories = list(cats)
+
+            try:
+                self.run_cat_cb["values"] = self.settings.categories
+                self.roster_cat_cb["values"] = self.settings.categories
+            except Exception:
+                pass
+
+            if self.settings.categories:
+                if self.category_var.get().strip() not in self.settings.categories:
+                    self.category_var.set(self.settings.categories[0])
+
+                cur_run_cat = self.run_category_var.get().strip()
+                if cur_run_cat and cur_run_cat not in self.settings.categories:
+                    self.run_category_var.set(self.category_var.get().strip())
+
+            self._render_roster()
+        except Exception:
+            pass
     def _update_info_bar(self):
         try:
             runs = self.state.get("runs", {}) if isinstance(self.state.get("runs"), dict) else {}
@@ -2290,6 +2867,7 @@ class App(tk.Tk):
         self._render_runs_table_text()
         self._update_export_preview()
         self._update_protocol_preview()
+        self._update_protocol_suggestion()
 
 
     def _treeview_flat_order(self, tv: ttk.Treeview) -> List[str]:
@@ -2571,6 +3149,23 @@ class App(tk.Tk):
         if not hasattr(self, "runs_tv"):
             return
 
+        prev_x = (0.0, 1.0)
+        prev_y = (0.0, 1.0)
+        prev_sel: List[str] = []
+        prev_open: set = set()
+        try:
+            prev_x = self.runs_tv.xview()
+            prev_y = self.runs_tv.yview()
+            prev_sel = [str(x) for x in self.runs_tv.selection()]
+            for iid in self.runs_tv.get_children(""):
+                try:
+                    if bool(self.runs_tv.item(iid, "open")):
+                        prev_open.add(str(iid))
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
         for iid in self.runs_tv.get_children(""):
             self.runs_tv.delete(iid)
 
@@ -2582,6 +3177,7 @@ class App(tk.Tk):
         global_split_ids = sorted(seen_split_ids, key=split_sort_key)
         self._ensure_runs_columns(global_split_ids)
         flt = self.run_filter_var.get().strip().lower()
+        ath_flt = self.ath_filter_var.get().strip().lower()
 
         idx = 0
         for run_key, run in items:
@@ -2593,16 +3189,45 @@ class App(tk.Tk):
             dm = run_distance_m(run)
             dm_s = str(dm) if dm is not None else ""
 
-            rows = self._protocol_sort_rows(run_key, run)
+            rows_sorted = self._protocol_sort_rows(run_key, run)
 
+            place_map: Dict[str, str] = {}
             place = 0
-            for r in rows:
+            for r in rows_sorted:
+                bib_k = str(r.get("bib") or "").strip()
                 st_u = (r.get("status") or "").strip().upper()
                 if r.get("finish_f") is not None and st_u not in ("DNS",):
                     place += 1
-                    r["place"] = str(place)
+                    place_map[bib_k] = str(place)
                 else:
-                    r["place"] = ""
+                    place_map[bib_k] = ""
+
+            rows_by_bib: Dict[str, Dict[str, Any]] = {}
+            for r in rows_sorted:
+                rows_by_bib[str(r.get("bib") or "").strip()] = dict(r)
+
+            rows: List[Dict[str, Any]] = []
+            ath = run.get("athletes") or {}
+            order = run.get("bib_order")
+            if isinstance(order, list) and order:
+                bibs = [safe_int_str(b) for b in order if safe_int_str(b)]
+            else:
+                bibs = [safe_int_str(b) for b in (ath.keys() if isinstance(ath, dict) else [])]
+            bibs = [b for b in bibs if b in rows_by_bib]
+
+            for b in bibs:
+                rr = rows_by_bib.get(b)
+                if rr is None:
+                    continue
+                rr["place"] = place_map.get(b, "")
+                rows.append(rr)
+
+            for r in rows_sorted:
+                b = str(r.get("bib") or "").strip()
+                if b and b not in bibs:
+                    rr = dict(r)
+                    rr["place"] = place_map.get(b, "")
+                    rows.append(rr)
 
             split_ids = self._runs_split_ids
 
@@ -2620,6 +3245,11 @@ class App(tk.Tk):
                     continue
             else:
                 shown = rows
+
+            if ath_flt:
+                shown = [r for r in shown if ath_flt in _ath_hay(r)]
+                if not shown:
+                    continue
 
             ath_n = len(rows)
             fin_n = 0
@@ -2699,19 +3329,31 @@ class App(tk.Tk):
                 except Exception:
                     pass
             try:
-                self.runs_tv.item(str(run_key), open=True)
+                self.runs_tv.item(str(run_key), open=(str(run_key) in prev_open) or (str(run_key) == str(self.selected_run_key or self.state.get("current_key") or "")))
             except Exception:
                 pass
 
             idx += 1
 
         cur = self.selected_run_key or self.state.get("current_key")
-        if cur and str(cur) in self.runs_tv.get_children(""):
-            try:
+        try:
+            to_select = [iid for iid in prev_sel if self.runs_tv.exists(iid)]
+            if to_select:
+                self.runs_tv.selection_set(to_select)
+            elif cur and str(cur) in self.runs_tv.get_children(""):
                 self.runs_tv.selection_set(str(cur))
-                self.runs_tv.see(str(cur))
+        except Exception:
+            pass
+
+        def _restore_runs_view(tv=self.runs_tv, x=float(prev_x[0]), y=float(prev_y[0])):
+            try:
+                if tv and int(tv.winfo_exists()):
+                    tv.xview_moveto(max(0.0, min(1.0, x)))
+                    tv.yview_moveto(max(0.0, min(1.0, y)))
             except Exception:
                 pass
+
+        self.after_idle(_restore_runs_view)
 
 
     def _on_run_select(self, _evt=None):
@@ -2721,6 +3363,7 @@ class App(tk.Tk):
             self.run_category_var.set("")
             self._update_export_preview()
             self._update_protocol_preview()
+            self._update_protocol_suggestion()
             return
 
         iid = str(sel[0])
@@ -2746,6 +3389,7 @@ class App(tk.Tk):
 
         self._update_export_preview()
         self._update_protocol_preview()
+        self._update_protocol_suggestion()
 
 
     def _on_run_category_changed(self):
@@ -2832,7 +3476,7 @@ class App(tk.Tk):
         srv_name = str(athlete.get("name") or "").strip()
         srv_country = str(athlete.get("country") or "").strip().upper()
 
-        cat = self.settings.run_categories.get(run_key, "") or self.run_category_var.get().strip() or self.category_var.get().strip()
+        cat = self.settings.run_categories.get(run_key, "")
         if not cat:
             return srv_name, srv_country
 
@@ -2867,7 +3511,7 @@ class App(tk.Tk):
         if not bib:
             return srv
 
-        cat = self.settings.run_categories.get(run_key, "") or self.run_category_var.get().strip() or self.category_var.get().strip()
+        cat = self.settings.run_categories.get(run_key, "")
         if not cat:
             return srv
 
@@ -2894,6 +3538,18 @@ class App(tk.Tk):
     def _render_athletes(self, run_key: Optional[str]):
         if not self.ath_tv:
             return
+
+        prev_x = (0.0, 1.0)
+        prev_y = (0.0, 1.0)
+        prev_sel: List[str] = []
+        try:
+            prev_x = self.ath_tv.xview()
+            prev_y = self.ath_tv.yview()
+            prev_sel = [str(x) for x in self.ath_tv.selection()]
+        except Exception:
+            pass
+
+        had_new_split = False
         for iid in self.ath_tv.get_children():
             self.ath_tv.delete(iid)
 
@@ -2913,6 +3569,7 @@ class App(tk.Tk):
             desired_cols.append("dist")
         desired_cols += [f"S{sid}" for sid in split_ids] + ["finish", "status"]
         if desired_cols != self._ath_cols:
+            had_new_split = len(split_ids) > len([c for c in self._ath_cols if str(c).startswith("S")])
             self._rebuild_ath_tree(split_ids=split_ids)
             self.ath_tv.bind("<Double-1>", self._on_athlete_double_click)
 
@@ -2952,7 +3609,7 @@ class App(tk.Tk):
             dist = ""
             if self.show_distance_var.get():
                 dm = athlete_distance_m(a)
-                if dm is None and a.get("finish") is not None:
+                if dm is None:
                     dm = run_distance_m(run)
                 if dm is not None:
                     dist = fmt_dist(dm)
@@ -2981,6 +3638,25 @@ class App(tk.Tk):
             tag = "even" if (idx % 2 == 0) else "odd"
             self.ath_tv.insert("", "end", iid=f"{run_key}:{bib}", values=row, tags=(tag,))
             idx += 1
+
+        try:
+            to_select = [iid for iid in prev_sel if self.ath_tv.exists(iid)]
+            if to_select:
+                self.ath_tv.selection_set(to_select)
+        except Exception:
+            pass
+
+        target_x = 1.0 if had_new_split else float(prev_x[0])
+
+        def _restore_ath_view(tv=self.ath_tv, x=target_x, y=float(prev_y[0])):
+            try:
+                if tv and int(tv.winfo_exists()):
+                    tv.xview_moveto(max(0.0, min(1.0, x)))
+                    tv.yview_moveto(max(0.0, min(1.0, y)))
+            except Exception:
+                pass
+
+        self.after_idle(_restore_ath_view)
 
     def _render_roster(self):
         for iid in self.roster_tv.get_children():
@@ -3610,6 +4286,12 @@ class App(tk.Tk):
         if not hasattr(self, "runs_text"):
             return
 
+        def _ru_time_cell(v: Any) -> str:
+            s = str(v or "")
+            if not s:
+                return ""
+            return s.replace(".", ",")
+
         items = self._runs_in_display_order()
 
         seen_split_ids: set = set()
@@ -3622,12 +4304,12 @@ class App(tk.Tk):
         cols += [f"S{sid}" for sid in split_ids] + ["Финиш", "Статус"]
 
         flt = self.run_filter_var.get().strip().lower()
+        ath_flt = self.ath_filter_var.get().strip().lower()
 
         def _ath_hay(r: Dict[str, Any]) -> str:
             return f"{r.get('bib','')} {r.get('name','')} {r.get('country','')} {r.get('finish','')} {r.get('status','')}".lower()
 
-        lines: List[str] = []
-        lines.append("	".join(cols))
+        table_rows: List[List[str]] = []
 
         for run_key, run in items:
             start = str(run.get("start_time") or "").strip()
@@ -3660,9 +4342,14 @@ class App(tk.Tk):
             else:
                 shown = rows
 
+            if ath_flt:
+                shown = [r for r in shown if ath_flt in _ath_hay(r)]
+                if not shown:
+                    continue
+
             for r in shown:
                 spm = self._splits_to_map(r.get("splits"))
-                sp_vals = [spm.get(str(sid), "") for sid in split_ids]
+                sp_vals = [_ru_time_cell(spm.get(str(sid), "")) for sid in split_ids]
 
                 row = [
                     str(run_key),
@@ -3677,8 +4364,53 @@ class App(tk.Tk):
                     str(r.get("country", "") or ""),
                 ]
                 row += [str(x or "") for x in sp_vals]
-                row += [str(r.get("finish", "") or ""), str(r.get("status", "") or "")]
-                lines.append("\t".join(row))
+                row += [_ru_time_cell(r.get("finish", "") or ""), str(r.get("status", "") or "")]
+                table_rows.append(row)
+
+        def _clean_cell(v: str) -> str:
+            return str(v or "").replace("\t", " ").replace("\r", " ").replace("\n", " ").strip()
+
+        max_width: Dict[str, int] = {
+            "Заезд": 9,
+            "Дисциплина": 26,
+            "Раунд": 14,
+            "Кат.": 12,
+            "Дист.,м": 7,
+            "Старт": 12,
+            "Место": 5,
+            "№": 5,
+            "Имя": 28,
+            "Стр/Гор": 14,
+            "Финиш": 10,
+            "Статус": 14,
+        }
+        for sid in split_ids:
+            max_width[f"S{sid}"] = 10
+
+        widths: List[int] = []
+        for i, col in enumerate(cols):
+            w = len(col)
+            for row in table_rows:
+                if i < len(row):
+                    w = max(w, len(_clean_cell(row[i])))
+            lim = max_width.get(col)
+            if lim is not None:
+                w = min(w, lim)
+            widths.append(max(3, w))
+
+        def _fit(v: str, w: int) -> str:
+            s = _clean_cell(v)
+            if len(s) > w:
+                return s[: max(1, w - 1)] + "…"
+            return s.ljust(w)
+
+        lines: List[str] = []
+        header = " | ".join(_fit(cols[i], widths[i]) for i in range(len(cols)))
+        sep = "-+-".join("-" * widths[i] for i in range(len(cols)))
+        lines.append(header)
+        lines.append(sep)
+        for row in table_rows:
+            lines.append(" | ".join(_fit((row[i] if i < len(row) else ""), widths[i]) for i in range(len(cols))))
 
         out = "\n".join(lines).rstrip() + "\n"
 

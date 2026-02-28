@@ -680,13 +680,16 @@
     return true;
   }
 
+  const HARD_STALE_SEC = 4.0;
+
   function render(){
     const now = Date.now()/1000;
 
-    const staleByFetch = (!lastOk || (now - lastOk) > 0.7);
-    const staleByPayload = (state && typeof state.ts === "number" && (now - state.ts) > 0.7);
+    const noStateYet = !state;
+    const hardStaleByFetch = (!lastOk || (now - lastOk) > HARD_STALE_SEC);
+    const hardStaleByPayload = (state && typeof state.ts === "number" && (now - state.ts) > HARD_STALE_SEC);
 
-    if(staleByFetch || staleByPayload){
+    if(noStateYet || hardStaleByFetch || hardStaleByPayload){
       hideAll();
       requestAnimationFrame(render);
       return;
