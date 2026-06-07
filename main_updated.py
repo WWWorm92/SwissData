@@ -269,28 +269,29 @@ def parse_time_any(token: Optional[str]) -> Optional[float]:
     s = clean_token(token)
     if not s:
         return None
+    s_norm = s.replace(",", ".")
 
-    m = TIME_HMS_RE.search(s)
+    m = TIME_HMS_RE.search(s_norm)
     if m:
         hh, mm, ss, ms = map(int, m.groups())
         return hh * 3600 + mm * 60 + ss + ms / 1000.0
 
-    m = TIME_MS_RE.search(s)
+    m = TIME_MS_RE.search(s_norm)
     if m:
         mm, ss, ms = map(int, m.groups())
         return mm * 60 + ss + ms / 1000.0
 
-    m = re.search(r"[+-]?\d+\.\d+", s)
+    m = re.search(r"[+-]?\d+\.\d+", s_norm)
     if m:
         try:
             return float(m.group(0))
         except Exception:
             return None
 
-    m = re.search(r"[+-]?\d+", s)
-    if m:
+    # Avoid false positives like "S1"/"L1": integer is valid only when token is numeric itself.
+    if re.fullmatch(r"[+-]?\d+", s_norm):
         try:
-            return float(m.group(0))
+            return float(s_norm)
         except Exception:
             return None
 
@@ -298,9 +299,21 @@ def parse_time_any(token: Optional[str]) -> Optional[float]:
 
 
 def find_primary_time(tokens: List[str]) -> Optional[float]:
-    for t in tokens:
+    # First pass: prefer explicit time-like tokens (colon/decimal), scanning from the right.
+    for t in reversed(tokens):
+        ts = clean_token(t)
+        if not ts:
+            continue
+        if (":" not in ts) and ("." not in ts) and ("," not in ts):
+            continue
         v = parse_time_any(t)
         if v is not None:
+            return v
+
+    # Second pass: numeric fallback (protect against lane/split markers -> 1.000).
+    for t in reversed(tokens):
+        v = parse_time_any(t)
+        if v is not None and v >= 2.0:
             return v
     return None
 
@@ -1114,19 +1127,19 @@ class App(tk.Tk):
         self.overlay_http.start()
 
         self._colors = {
-            "bg": "#0f1117",
-            "panel": "#151a23",
-            "panel2": "#111621",
-            "fg": "#e6e6e6",
-            "muted": "#a8b0bf",
-            "line": "#242b3a",
-            "accent": "#3aa0ff",
-            "accent2": "#7ee787",
-            "danger": "#ff5c5c",
-            "select": "#243044",
-            "head": "#1b2230",
-            "odd": "#121826",
-            "even": "#0f1522",
+            "bg": "#0c1118",
+            "panel": "#131c27",
+            "panel2": "#0f1722",
+            "fg": "#edf2f8",
+            "muted": "#9eb0c4",
+            "line": "#243345",
+            "accent": "#4fc0ff",
+            "accent2": "#78d6a7",
+            "danger": "#ff6b6b",
+            "select": "#203246",
+            "head": "#182433",
+            "odd": "#111a27",
+            "even": "#0e1723",
         }
         #HTTP Server
         self.net = TcpStateServer(listen_host, listen_port, on_error=self._net_error)
@@ -1264,34 +1277,48 @@ class App(tk.Tk):
 
         style.configure(".", background=c["bg"], foreground=c["fg"])
         style.configure("TFrame", background=c["bg"])
-        style.configure("Card.TFrame", background=c["panel"])
+        style.configure("Card.TFrame", background=c["panel"], relief="flat", borderwidth=0)
         style.configure("TimerCard.TFrame", background=c["panel2"])
         style.configure("TLabel", background=c["bg"], foreground=c["fg"])
         style.configure("Muted.TLabel", background=c["bg"], foreground=c["muted"])
-        style.configure("Title.TLabel", background=c["bg"], foreground=c["fg"], font=("Segoe UI", 16, "bold"))
+        style.configure("Title.TLabel", background=c["bg"], foreground=c["fg"], font=("Segoe UI", 18, "bold"))
         style.configure("H2.TLabel", background=c["bg"], foreground=c["fg"], font=("Segoe UI", 13, "bold"))
+        style.configure("SubTitle.TLabel", background=c["bg"], foreground=blend_hex(c["muted"], c["accent"], 0.25), font=("Segoe UI", 10))
 
         style.configure("TimerTitle.TLabel", background=c["panel2"], foreground=c["muted"], font=("Segoe UI", 12, "bold"))
         style.configure("TimerRun.TLabel", background=c["panel2"], foreground=c["muted"], font=("Segoe UI", 12))
         style.configure("AthBib.TLabel", background=c["panel2"], foreground=c["fg"], font=("Segoe UI", 18, "bold"))
         style.configure("AthTime.TLabel", background=c["panel2"], foreground=c["fg"], font=("Segoe UI", 34, "bold"))
 
-        style.configure("TButton", background=c["panel"], foreground=c["fg"], borderwidth=0, padding=(14, 10))
-        style.map("TButton", background=[("active", c["head"]), ("pressed", c["select"])])
+        style.configure("TButton", background=blend_hex(c["panel2"], c["head"], 0.35), foreground=c["fg"], borderwidth=0, padding=(14, 9), relief="flat")
+        style.map("TButton",
+                  background=[("active", blend_hex(c["panel2"], c["accent"], 0.22)), ("pressed", blend_hex(c["select"], c["head"], 0.45))],
+                  foreground=[("disabled", blend_hex(c["muted"], c["panel2"], 0.35))])
 
-        style.configure("Accent.TButton", background=c["accent"], foreground="#0b0d12", padding=(14, 10))
-        style.map("Accent.TButton", background=[("active", "#5bb3ff"), ("pressed", "#2f8fe6")])
+        style.configure("Accent.TButton", background=c["accent"], foreground="#0b1220", borderwidth=0, padding=(14, 9), relief="flat")
+        style.map("Accent.TButton", background=[("active", blend_hex(c["accent"], "#ffffff", 0.2)), ("pressed", blend_hex(c["accent"], "#000000", 0.15))])
 
         style.configure("TCombobox",
-                        padding=(10, 8),
+                        padding=(10, 7),
                         fieldbackground=c["panel2"],
                         background=c["panel2"],
                         foreground=c["fg"],
+                        borderwidth=1,
+                        arrowsize=14,
                         arrowcolor=c["fg"])
+        style.map("TCombobox",
+                  fieldbackground=[("readonly", c["panel2"]), ("!readonly", c["panel2"]), ("active", blend_hex(c["panel2"], c["accent"], 0.08))],
+                  background=[("readonly", c["panel2"]), ("!readonly", c["panel2"]), ("active", blend_hex(c["panel2"], c["accent"], 0.08))],
+                  foreground=[("readonly", c["fg"]), ("!readonly", c["fg"]), ("disabled", c["muted"]), ("active", c["fg"])])
+
+        # Keep dropdown compatible across Windows themes.
+        # (Some listbox overrides can break opening/selection on certain systems.)
 
         style.configure("TNotebook", background=c["bg"], borderwidth=0)
-        style.configure("TNotebook.Tab", background=c["panel"], foreground=c["muted"], padding=(14, 10), borderwidth=0)
-        style.map("TNotebook.Tab", background=[("selected", c["head"])], foreground=[("selected", c["fg"])])
+        style.configure("TNotebook.Tab", background=c["panel"], foreground=c["muted"], padding=(16, 10), borderwidth=0)
+        style.map("TNotebook.Tab",
+                  background=[("selected", c["head"]), ("active", blend_hex(c["head"], c["accent"], 0.18))],
+                  foreground=[("selected", c["fg"]), ("active", c["fg"])])
 
         style.configure("Treeview",
                         background=c["panel2"],
@@ -1325,6 +1352,7 @@ class App(tk.Tk):
         top = ttk.Frame(root, style="TFrame")
         top.pack(fill="x", padx=14, pady=(14, 10))
         ttk.Label(top, text="SwissTiming Quantum Viewer", style="Title.TLabel").pack(anchor="w")
+        ttk.Label(top, text="Race control panel · Live timing · Overlay bridge", style="SubTitle.TLabel").pack(anchor="w", pady=(2, 0))
 
         bar = ttk.Frame(root, style="Card.TFrame")
         bar.pack(fill="x", padx=14, pady=(0, 12))
@@ -1754,7 +1782,7 @@ class App(tk.Tk):
         self._ath_row_widgets: List[List[tk.Label]] = []
 
         for ci, (_cid, title, _w, anchor, even_split) in enumerate(cols):
-            split_accent = "#2bb9a9"
+            split_accent = "#f2b54b"
             bg = blend_hex(c["head"], split_accent, 0.38) if even_split else c["head"]
             hdr = tk.Label(
                 self._ath_header,
@@ -1763,10 +1791,10 @@ class App(tk.Tk):
                 fg=c["fg"],
                 font=("Segoe UI", 12, "bold"),
                 anchor=("w" if anchor == "w" else "center"),
-                padx=8,
-                pady=9,
-                relief="solid",
-                bd=1,
+                padx=10,
+                pady=8,
+                relief="flat",
+                bd=0,
                 highlightthickness=0,
             )
             hdr.grid(row=0, column=ci, sticky="nsew")
@@ -1818,14 +1846,14 @@ class App(tk.Tk):
         legend = tk.Label(
             self.ath_container,
             text="• четные отсечки",
-            bg=blend_hex(c["panel"], "#2bb9a9", 0.18),
-            fg=blend_hex(c["fg"], "#2bb9a9", 0.40),
+            bg=blend_hex(c["panel"], "#f2b54b", 0.18),
+            fg=blend_hex(c["fg"], "#f2b54b", 0.52),
             font=("Segoe UI", 10),
             anchor="e",
-            padx=6,
-            pady=2,
-            relief="solid",
-            bd=1,
+            padx=8,
+            pady=3,
+            relief="flat",
+            bd=0,
         )
         legend.grid(row=3, column=0, sticky="e", pady=(2, 0))
 
@@ -1848,8 +1876,8 @@ class App(tk.Tk):
             row_widgets: List[tk.Label] = []
             for ci, (_cid, _title, _w, anchor, even_split) in enumerate(col_defs):
                 txt = str(row[ci]) if ci < len(row) else ""
-                split_accent = "#2bb9a9"
-                cell_bg = blend_hex(base_bg, split_accent, 0.20) if even_split else base_bg
+                split_accent = "#f2b54b"
+                cell_bg = blend_hex(base_bg, split_accent, 0.15) if even_split else base_bg
                 is_time_col = str(_cid).startswith("S") or str(_cid) == "finish"
                 font = ("Consolas", 11) if is_time_col else ("Segoe UI", 11)
                 lbl = tk.Label(
@@ -1859,10 +1887,10 @@ class App(tk.Tk):
                     fg=c["fg"],
                     font=font,
                     anchor=("w" if anchor == "w" else "center"),
-                    padx=8,
-                    pady=6,
-                    relief="solid",
-                    bd=1,
+                    padx=10,
+                    pady=7,
+                    relief="flat",
+                    bd=0,
                     highlightthickness=0,
                 )
                 lbl.grid(row=ri, column=ci, sticky="nsew")
@@ -1944,6 +1972,9 @@ class App(tk.Tk):
     def _tick_live_panel(self):
         key = self.selected_run_key or self.model.current_key
         run = self.model.runs.get(key) if key else None
+        cur = self.model.runs.get(self.model.current_key) if self.model.current_key else None
+        if run and cur and run.start_mono is None and cur.start_mono is not None:
+            run = cur
 
         if not run:
             self.live_run_var.set("Заезд: —")
@@ -1965,8 +1996,14 @@ class App(tk.Tk):
 
         self.live_run_var.set(f"Заезд: {run.key}")
 
-        b1 = run.active_bibs[0] if len(run.active_bibs) > 0 else ""
-        b2 = run.active_bibs[1] if len(run.active_bibs) > 1 else ""
+        active = [str(b) for b in (run.active_bibs or []) if str(b)]
+        if not active:
+            active = [str(b) for b in (run.bib_order or []) if str(b)]
+        if not active and run.athletes:
+            active = [str(b) for b in run.athletes.keys() if str(b)]
+
+        b1 = active[0] if len(active) > 0 else ""
+        b2 = active[1] if len(active) > 1 else ""
 
         a1 = run.athletes.get(b1) if b1 else None
         a2 = run.athletes.get(b2) if b2 else None

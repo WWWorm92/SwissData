@@ -1,0 +1,1106 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SwissStats</title>
+  <style>
+    :root {
+      --bg: #0a1118;
+      --card: #121c27;
+      --line: #263545;
+      --ink: #e6edf5;
+      --muted: #91a5bc;
+      --accent: #2bb3a6;
+      --accent-soft: #183843;
+      --accent-2: #e0a93b;
+      --shadow: 0 14px 30px rgba(2, 7, 13, 0.45);
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(1100px 500px at 10% -10%, #10343e 0%, transparent 55%),
+        radial-gradient(1200px 600px at 100% -20%, #3d2d17 0%, transparent 52%),
+        var(--bg);
+      font-family: "Bahnschrift", "Segoe UI Variable", "Segoe UI", sans-serif;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 14px 16px;
+      border-bottom: 1px solid #264258;
+      background: linear-gradient(180deg, rgba(9, 17, 27, 0.95) 0%, rgba(9, 17, 27, 0.82) 100%);
+      backdrop-filter: blur(8px);
+    }
+
+    .brand { display: flex; flex-direction: column; gap: 2px; }
+    .brand-title { font-size: 22px; font-weight: 800; letter-spacing: .35px; }
+    .brand-sub { color: var(--muted); font-size: 13px; }
+
+    .pulse {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #9eeadf;
+    }
+
+    .pulse-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: #2bb3a6;
+      box-shadow: 0 0 0 0 rgba(43, 179, 166, 0.9);
+      animation: ping 1.8s infinite;
+    }
+
+    @keyframes ping {
+      0% { box-shadow: 0 0 0 0 rgba(43, 179, 166, 0.8); }
+      100% { box-shadow: 0 0 0 14px rgba(43, 179, 166, 0); }
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 280px 340px 1fr;
+      gap: 12px;
+      min-height: calc(100vh - 72px);
+      padding: 12px 12px 14px;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+      animation: fadeUp .28s ease;
+    }
+
+    @keyframes fadeUp {
+      from { transform: translateY(7px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .head {
+      padding: 14px 14px 12px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #172332 0%, #121d2a 100%);
+    }
+
+    .title {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: .2px;
+    }
+
+    .sub {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .sub-row {
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .count-badge {
+      border: 1px solid #34536d;
+      color: #b9d8f3;
+      background: #112233;
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .input {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #0f1722;
+      border-radius: 10px;
+      padding: 10px 11px;
+      font: inherit;
+      color: inherit;
+      outline: none;
+    }
+
+    .input:focus {
+      border-color: #41b7ab;
+      box-shadow: 0 0 0 3px rgba(43, 179, 166, 0.2);
+      background: #101b28;
+    }
+
+    .btn {
+      border: 1px solid #2f6d78;
+      background: var(--accent-soft);
+      color: #b9f2ec;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .btn:hover { background: #214955; }
+
+    .seg {
+      border: 1px solid #35556f;
+      background: #0f1d2a;
+      color: #d4e6f9;
+      border-radius: 10px;
+      padding: 9px 10px;
+      font: inherit;
+      font-size: 13px;
+      min-width: 140px;
+    }
+
+    .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: #b4c8dd;
+      font-size: 13px;
+      user-select: none;
+    }
+
+    .toggle input { accent-color: #2bb3a6; }
+
+    .list {
+      overflow: auto;
+      padding: 8px;
+      min-height: 0;
+    }
+
+    .list::-webkit-scrollbar,
+    .content::-webkit-scrollbar,
+    .compact::-webkit-scrollbar { width: 10px; height: 10px; }
+    .list::-webkit-scrollbar-thumb,
+    .content::-webkit-scrollbar-thumb,
+    .compact::-webkit-scrollbar-thumb {
+      background: #2b4055;
+      border-radius: 999px;
+      border: 2px solid #0e1823;
+    }
+
+    .item {
+      border: 1px solid transparent;
+      border-radius: 11px;
+      padding: 10px 11px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: .16s ease;
+      background: #0f1925;
+      border-left: 3px solid transparent;
+    }
+
+    .item:hover {
+      border-color: #355068;
+      background: #132130;
+      transform: translateY(-1px);
+      border-left-color: #355068;
+    }
+
+    .item.active {
+      border-color: #3ba99b;
+      background: linear-gradient(180deg, #163843 0%, #183440 100%);
+      border-left-color: #58d9cb;
+    }
+
+    .item-main { font-size: 14px; font-weight: 600; }
+    .item-sub { margin-top: 3px; font-size: 12px; color: var(--muted); }
+    .chip-country {
+      display: inline-flex;
+      margin-left: 6px;
+      padding: 1px 6px;
+      border-radius: 999px;
+      border: 1px solid #3a5874;
+      color: #c9def5;
+      font-size: 11px;
+      background: #132335;
+    }
+
+    .toolbar-spacer { flex: 1; }
+
+    .fab {
+      position: fixed;
+      right: 16px;
+      bottom: 64px;
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      border: 1px solid #3b5974;
+      background: #163749;
+      color: #d9f7f2;
+      cursor: pointer;
+      display: none;
+      box-shadow: 0 10px 20px rgba(4, 12, 20, 0.35);
+      z-index: 15;
+    }
+
+    .fab.show { display: inline-flex; align-items: center; justify-content: center; }
+
+    .content {
+      overflow: auto;
+      padding: 16px;
+    }
+
+    .hero {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(110deg, #173342 0%, #152535 65%);
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .hero-name {
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1.15;
+    }
+
+    .hero-meta {
+      color: var(--muted);
+      margin-top: 6px;
+      font-size: 14px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(140px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #152230;
+      padding: 10px;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: .2px;
+    }
+
+    .metric-value {
+      margin-top: 4px;
+      font-size: 22px;
+      font-weight: 700;
+      color: #8af3e4;
+    }
+
+    .distance-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #152230;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .distance-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: #172636;
+    }
+
+    .distance-title {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid #7a6535;
+      background: #352d19;
+      color: #ffd68f;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 9px 10px;
+      border-bottom: 1px solid #1f3042;
+      vertical-align: top;
+    }
+
+    th {
+      color: #9eb3cb;
+      background: #111c29;
+      font-weight: 700;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    tbody tr:nth-child(2n) td { background: #111d2b; }
+
+    .mono {
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 12px;
+    }
+
+    .muted { color: var(--muted); }
+
+    .splits-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 3px 0 2px;
+      align-items: baseline;
+    }
+
+    .splits-row .sp {
+      display: inline-flex;
+      gap: 3px;
+      font-size: 12px;
+      font-family: "Consolas", "Courier New", monospace;
+      color: #7cb8d4;
+    }
+
+    .splits-row .sp .sn {
+      color: #4a6a7e;
+      font-size: 11px;
+    }
+
+    .splits-row .sp.fin {
+      color: #8af3e4;
+      font-weight: 700;
+    }
+
+    .splits-row .sep {
+      color: #2a4a5e;
+      font-size: 11px;
+      user-select: none;
+    }
+
+    .state {
+      border: 1px dashed #35516c;
+      border-radius: 12px;
+      padding: 16px;
+      color: var(--muted);
+      background: #111b27;
+      text-align: center;
+    }
+
+    .toast {
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      background: #a83434;
+      color: #fff;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 13px;
+      box-shadow: 0 8px 18px rgba(168, 52, 52, 0.32);
+      display: none;
+      max-width: 420px;
+      z-index: 10;
+    }
+
+    .compact {
+      max-height: 360px;
+      overflow: auto;
+    }
+
+    @media (max-width: 1200px) {
+      .app { grid-template-columns: 250px 300px 1fr; }
+      .metrics { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+    }
+
+    @media (max-width: 980px) {
+      .app {
+        grid-template-columns: 1fr;
+        min-height: auto;
+      }
+      .panel { min-height: 240px; }
+      .content { max-height: none; }
+      .compact { max-height: 300px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-title">SwissStats</div>
+      <div class="brand-sub">Публичная статистика стартов и результатов</div>
+    </div>
+    <div class="pulse"><span class="pulse-dot"></span> live данные</div>
+  </header>
+
+  <div class="app">
+    <section class="panel">
+      <header class="head">
+        <h2 class="title">Категории</h2>
+        <div class="sub-row"><div class="sub">Выберите группу участников</div><div id="catCount" class="count-badge">0</div></div>
+        <div class="toolbar"><input id="catFilter" class="input" placeholder="Поиск категории" /></div>
+      </header>
+      <div id="categories" class="list"></div>
+    </section>
+
+    <section class="panel">
+      <header class="head">
+        <h2 class="title">Гонщики</h2>
+        <div class="sub-row"><div class="sub" id="athHint">Сначала выберите категорию</div><div id="athCount" class="count-badge">0</div></div>
+        <div class="toolbar"><input id="athFilter" class="input" placeholder="Поиск по имени или №" /></div>
+      </header>
+      <div id="athletes" class="list"></div>
+    </section>
+
+    <section class="panel">
+      <header class="head">
+        <h2 class="title">Статистика</h2>
+        <div class="sub">Результаты по дистанциям и заездам</div>
+        <div class="toolbar">
+          <button id="reloadBtn" class="btn">Обновить</button>
+          <select id="viewMode" class="seg">
+            <option value="cards">Карточки дистанций</option>
+            <option value="timeline">Лента заездов</option>
+            <option value="topcat">Топ гонщиков категории</option>
+          </select>
+          <span class="toolbar-spacer"></span>
+          <label class="toggle"><input id="autoRefresh" type="checkbox" /> авто 30с</label>
+        </div>
+      </header>
+      <div id="content" class="content">
+        <div class="state">Выберите категорию и гонщика</div>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <button id="toTop" class="fab" title="Наверх">↑</button>
+
+  <script>
+    const elCats = document.getElementById("categories");
+    const elAth = document.getElementById("athletes");
+    const elContent = document.getElementById("content");
+    const elAthHint = document.getElementById("athHint");
+    const elCatFilter = document.getElementById("catFilter");
+    const elAthFilter = document.getElementById("athFilter");
+    const elToast = document.getElementById("toast");
+    const elReload = document.getElementById("reloadBtn");
+    const elCatCount = document.getElementById("catCount");
+    const elAthCount = document.getElementById("athCount");
+    const elViewMode = document.getElementById("viewMode");
+    const elAutoRefresh = document.getElementById("autoRefresh");
+    const elToTop = document.getElementById("toTop");
+
+    const state = {
+      categories: [],
+      athletes: [],
+      currentCategory: "",
+      currentAthlete: null,
+      currentDetails: [],
+      topItems: [],
+      viewMode: "cards",
+      autoRefreshTimer: null,
+      reqToken: 0,
+      refreshBusy: false
+    };
+    let liveSource = null;
+    let liveRefreshTimer = null;
+
+    function nextToken() {
+      state.reqToken += 1;
+      return state.reqToken;
+    }
+
+    function isStale(token) {
+      return token !== state.reqToken;
+    }
+
+    function escapeHtml(v) {
+      return String(v ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function showError(err) {
+      elToast.textContent = `Ошибка: ${String(err?.message || err || "неизвестно")}`;
+      elToast.style.display = "block";
+      clearTimeout(showError._t);
+      showError._t = setTimeout(() => { elToast.style.display = "none"; }, 4800);
+    }
+
+    async function jget(url) {
+      const r = await fetch(url, { cache: "no-store" });
+      if (!r.ok) {
+        throw new Error(`${url} [${r.status}]`);
+      }
+      return r.json();
+    }
+
+    function fmtDate(v) {
+      if (!v) return "";
+      if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(String(v))) return String(v);
+      const d = new Date(v);
+      if (!Number.isFinite(d.getTime())) return String(v);
+      return d.toLocaleString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      });
+    }
+
+    function fmtRunDateTime(runStarted, createdAt) {
+      const created = String(createdAt || "").trim();
+      if (created) return fmtDate(created);
+      return fmtDate(String(runStarted || "").trim());
+    }
+
+    function bestText(item) {
+      if (!item) return "-";
+      return item.finish_text || (item.finish_sec ?? "-");
+    }
+
+    function decodeCategory(raw) {
+      const src = String(raw || "").trim();
+      if (!src) return "";
+
+      const m = src.match(/^([a-zа-я])\s*(\d{2})(?:\s*[-/]\s*(\d{2}))?$/i);
+      if (!m) return src;
+
+      const p = m[1].toLowerCase();
+      const y1 = Number(m[2]);
+      const y2 = m[3] ? Number(m[3]) : null;
+
+      let group = "";
+      if (["d", "д", "f", "ж"].includes(p)) group = "Девочки";
+      else if (["m", "м", "b", "ю"].includes(p)) group = "Мальчики";
+      else return src;
+
+      const fullYear = (yy) => (yy >= 0 && yy <= 99 ? 2000 + yy : yy);
+      const y1f = fullYear(y1);
+      if (y2 === null || Number.isNaN(y2)) {
+        return `${group} ${y1f} г.р.`;
+      }
+      return `${group} ${y1f}-${fullYear(y2)} г.р.`;
+    }
+
+    function categoryLabel(raw) {
+      const src = String(raw || "").trim();
+      const dec = decodeCategory(src);
+      if (!src) return "";
+      if (!dec || dec === src) return src;
+      return `${dec} (${src})`;
+    }
+
+    function markActive(container, value) {
+      [...container.querySelectorAll(".item")]
+        .forEach((x) => x.classList.toggle("active", x.dataset.v === value));
+    }
+
+    function renderCategories() {
+      const q = elCatFilter.value.trim().toLowerCase();
+      const items = state.categories.filter((c) => {
+        const raw = String(c || "");
+        const dec = categoryLabel(raw);
+        return `${raw} ${dec}`.toLowerCase().includes(q);
+      });
+      elCatCount.textContent = `${items.length}`;
+      elCats.innerHTML = "";
+
+      if (!items.length) {
+        elCats.innerHTML = '<div class="state">Категории не найдены</div>';
+        return;
+      }
+
+      for (const c of items) {
+        const div = document.createElement("div");
+        div.className = "item";
+        div.dataset.v = c;
+        const dec = categoryLabel(c);
+        if (dec !== c) {
+          div.innerHTML = `<div class="item-main">${escapeHtml(dec)}</div><div class="item-sub">Код: ${escapeHtml(c)}</div>`;
+        } else {
+          div.innerHTML = `<div class="item-main">${escapeHtml(c)}</div>`;
+        }
+        div.onclick = () => selectCategory(c);
+        elCats.appendChild(div);
+      }
+      if (state.currentCategory) {
+        markActive(elCats, state.currentCategory);
+      }
+    }
+
+    function renderAthletes() {
+      const q = elAthFilter.value.trim().toLowerCase();
+      const items = state.athletes.filter((a) => {
+        const s = `${a.name || ""} ${a.bib || ""}`.toLowerCase();
+        return s.includes(q);
+      });
+      elAthCount.textContent = `${items.length}`;
+
+      elAth.innerHTML = "";
+      if (!state.currentCategory) {
+        elAth.innerHTML = '<div class="state">Сначала выберите категорию</div>';
+        return;
+      }
+      if (!items.length) {
+        elAth.innerHTML = '<div class="state">Гонщики не найдены</div>';
+        return;
+      }
+
+      for (const a of items) {
+        const div = document.createElement("div");
+        div.className = "item";
+        div.dataset.v = String(a.id);
+        const cc = a.country ? `<span class=\"chip-country\">${escapeHtml(a.country)}</span>` : "";
+        div.innerHTML = `
+          <div class="item-main">${escapeHtml(a.name || "Без имени")}</div>
+          <div class="item-sub">№ ${escapeHtml(a.bib)} ${cc}</div>
+        `;
+        div.onclick = () => selectAthlete(a);
+        elAth.appendChild(div);
+      }
+
+      if (state.currentAthlete) {
+        markActive(elAth, String(state.currentAthlete.id));
+      }
+    }
+
+    function setContentState(text) {
+      elContent.innerHTML = `<div class="state">${escapeHtml(text)}</div>`;
+    }
+
+    async function loadCategories() {
+      const d = await jget("/api/categories");
+      state.categories = Array.isArray(d.items) ? d.items : [];
+      if (!state.currentCategory && state.categories.length) {
+        state.currentCategory = state.categories[0];
+      }
+      renderCategories();
+
+      if (state.currentCategory && state.categories.includes(state.currentCategory)) {
+        await selectCategory(state.currentCategory, { keepAthlete: true });
+      }
+    }
+
+    async function selectCategory(cat, opts = {}) {
+      const token = nextToken();
+      state.currentCategory = cat;
+      if (!opts.keepAthlete) {
+        state.currentAthlete = null;
+      }
+      markActive(elCats, cat);
+      elAthHint.textContent = `Категория: ${categoryLabel(cat)}`;
+      setContentState("Загрузка гонщиков...");
+
+      const d = await jget(`/api/athletes?category=${encodeURIComponent(cat)}`);
+      if (isStale(token)) return;
+      state.athletes = Array.isArray(d.items) ? d.items : [];
+      renderAthletes();
+
+      if (state.viewMode === "topcat") {
+        await renderCategoryTop(cat, token);
+        return;
+      }
+
+      if (!state.athletes.length) {
+        setContentState("В этой категории пока нет результатов");
+        return;
+      }
+
+      if (state.currentAthlete) {
+        const keep = state.athletes.find((x) => x.id === state.currentAthlete.id);
+        if (keep) {
+          await selectAthlete(keep);
+          return;
+        }
+      }
+      if (isStale(token)) return;
+      setContentState("Выберите гонщика");
+    }
+
+    function splitsInline(splits) {
+      if (!splits || !splits.length) return "";
+      const parts = splits.map((s, i) => {
+        const txt = escapeHtml(s.split_text || (s.split_sec ?? ""));
+        const isFin = i === splits.length - 1;
+        return `<span class="sp${isFin ? " fin" : ""}"><span class="sn">${s.split_num}:</span>${txt}</span>`;
+      }).join('<span class="sep">·</span>');
+      return `<div class="splits-row">${parts}</div>`;
+    }
+
+    function renderDistanceCard(distanceM, attempts, bestItem, runsItems) {
+      const rows = (runsItems || []).map((r) => {
+        const result = escapeHtml(r.finish_text || (r.finish_sec ?? ""));
+        const status = escapeHtml(r.status || "-");
+        const sp = splitsInline(r.splits || []);
+        return `
+          <tr>
+            <td class="mono">${escapeHtml(r.run_key || "-")}</td>
+            <td>${escapeHtml(fmtRunDateTime(r.run_started_at_text, r.created_at))}</td>
+            <td class="mono">${result}</td>
+            <td>${status}</td>
+          </tr>
+          ${sp ? `<tr><td colspan="4" style="padding:2px 10px 4px;">${sp}</td></tr>` : ""}
+        `;
+      }).join("");
+
+      return `
+        <article class="distance-card">
+          <div class="distance-head">
+            <div class="distance-title">${escapeHtml(distanceM)} м</div>
+            <div class="badge">Попыток: ${escapeHtml(attempts)}</div>
+          </div>
+          <div style="padding:12px 14px 6px;">
+            <div class="muted" style="font-size:12px;">Лучший результат</div>
+            <div style="font-size:24px; font-weight:700; color:#8af3e4; margin-top:2px;">
+              ${escapeHtml(bestText(bestItem))}
+            </div>
+            <div class="muted" style="margin-top:2px; font-size:12px;">
+              ${escapeHtml(fmtRunDateTime(bestItem?.run_started_at_text, bestItem?.created_at))}
+            </div>
+          </div>
+          <div class="compact" style="padding:8px 12px 12px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Заезд</th>
+                  <th>Дата заезда</th>
+                  <th>Результат</th>
+                  <th>Статус</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows || '<tr><td colspan="4" class="muted">Нет заездов</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderTimeline(details) {
+      const rows = [];
+      for (const d of (details || [])) {
+        for (const r of (d.runs || [])) {
+          rows.push({
+            distance_m: d.distance_m,
+            run_key: r.run_key || "",
+            dt: fmtRunDateTime(r.run_started_at_text, r.created_at),
+            finish_text: r.finish_text || (r.finish_sec ?? ""),
+            status: r.status || "",
+            splits: r.splits || []
+          });
+        }
+      }
+      rows.sort((a, b) => String(b.dt).localeCompare(String(a.dt)));
+
+      const body = rows.map((r) => {
+        const sp = splitsInline(r.splits || []);
+        return `
+          <tr>
+            <td>${escapeHtml(String(r.distance_m || ""))} м</td>
+            <td class="mono">${escapeHtml(r.run_key || "-")}</td>
+            <td>${escapeHtml(r.dt || "")}</td>
+            <td class="mono">${escapeHtml(r.finish_text || "")}</td>
+            <td>${escapeHtml(r.status || "")}</td>
+          </tr>
+          ${sp ? `<tr><td colspan="5" style="padding:2px 10px 4px;">${sp}</td></tr>` : ""}
+        `;
+      }).join("");
+
+      return `
+        <article class="distance-card">
+          <div class="distance-head">
+            <div class="distance-title">Лента результатов</div>
+            <div class="badge">Записей: ${rows.length}</div>
+          </div>
+          <div class="compact" style="padding:8px 12px 12px; max-height:520px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Дистанция</th>
+                  <th>Заезд</th>
+                  <th>Дата заезда</th>
+                  <th>Результат</th>
+                  <th>Статус</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${body || '<tr><td colspan="5" class="muted">Нет данных</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderAthleteContent(a, details) {
+      const totalRuns = details.reduce((acc, x) => acc + x.attempts, 0);
+      const bestOverall = details
+        .map((x) => x.best)
+        .filter(Boolean)
+        .sort((x, y) => (x.finish_sec ?? Number.MAX_VALUE) - (y.finish_sec ?? Number.MAX_VALUE))[0] || null;
+
+      let html = `
+        <section class="hero">
+          <div class="hero-name">${escapeHtml(a.name || "Без имени")}</div>
+          <div class="hero-meta">№ ${escapeHtml(a.bib)} · ${escapeHtml(categoryLabel(state.currentCategory))}${a.country ? " · " + escapeHtml(a.country) : ""}</div>
+          <div class="metrics">
+            <div class="metric">
+              <div class="metric-label">Дистанций</div>
+              <div class="metric-value">${details.length}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Всего попыток</div>
+              <div class="metric-value">${totalRuns}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Лучший общий</div>
+              <div class="metric-value" style="color:#ffd68f;">${escapeHtml(bestText(bestOverall))}</div>
+            </div>
+          </div>
+        </section>
+      `;
+
+      if (!details.length) {
+        html += '<div class="state">У этого гонщика пока нет результатов</div>';
+        return html;
+      }
+
+      if (state.viewMode === "timeline") {
+        html += renderTimeline(details);
+      } else {
+        details
+          .slice()
+          .sort((a1, a2) => a1.distance_m - a2.distance_m)
+          .forEach((row) => {
+            html += renderDistanceCard(row.distance_m, row.attempts, row.best, row.runs);
+          });
+      }
+      return html;
+    }
+
+    async function renderCategoryTop(category, parentToken = null) {
+      const token = parentToken || nextToken();
+      setContentState("Загрузка топа категории...");
+      const d = await jget(`/api/category/top?category=${encodeURIComponent(category)}&limit=50`);
+      if (isStale(token)) return;
+      const items = Array.isArray(d.items) ? d.items : [];
+      state.topItems = items;
+
+      const rows = items.map((r, idx) => `
+        <tr>
+          <td>${idx + 1}</td>
+          <td><b>${escapeHtml(r.name || "Без имени")}</b></td>
+          <td class="mono">${escapeHtml(r.bib || "")}</td>
+          <td class="mono">${escapeHtml(r.best_text || (r.best_sec ?? ""))}</td>
+          <td>${escapeHtml(fmtRunDateTime(r.best_run_started_at_text, r.best_created_at))}</td>
+          <td>${escapeHtml(String(r.attempts ?? ""))}</td>
+          <td>${escapeHtml(String(r.distances ?? ""))}</td>
+          <td><button class="btn top-open" data-athlete-id="${escapeHtml(String(r.athlete_id || ""))}" style="padding:6px 10px;">Открыть</button></td>
+        </tr>
+      `).join("");
+
+      const html = `
+        <section class="hero">
+          <div class="hero-name">Топ гонщиков</div>
+          <div class="hero-meta">${escapeHtml(categoryLabel(category))}</div>
+        </section>
+        <article class="distance-card">
+          <div class="distance-head">
+            <div class="distance-title">Рейтинг категории</div>
+            <div class="badge">Участников: ${items.length}</div>
+          </div>
+          <div class="compact" style="padding:8px 12px 12px; max-height:620px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Гонщик</th>
+                  <th>№</th>
+                  <th>Лучший</th>
+                  <th>Дата заезда</th>
+                  <th>Попыток</th>
+                  <th>Дистанций</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows || '<tr><td colspan="8" class="muted">В категории пока нет финишей</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      `;
+      if (isStale(token)) return;
+      elContent.innerHTML = html;
+
+      for (const btn of elContent.querySelectorAll(".top-open")) {
+        btn.onclick = async () => {
+          const id = Number(btn.getAttribute("data-athlete-id") || 0);
+          if (!id) return;
+          const a = state.athletes.find((x) => Number(x.id) === id);
+          if (!a) return;
+          state.viewMode = "cards";
+          elViewMode.value = "cards";
+          await selectAthlete(a);
+        };
+      }
+    }
+
+    async function selectAthlete(a) {
+      const token = nextToken();
+      state.currentAthlete = a;
+      markActive(elAth, String(a.id));
+      setContentState("Загрузка статистики...");
+
+      const d = await jget(`/api/athlete/${a.id}/full`);
+      if (isStale(token)) return;
+      const details = Array.isArray(d.items) ? d.items : [];
+      state.currentDetails = details;
+      if (isStale(token)) return;
+      elContent.innerHTML = renderAthleteContent(a, details);
+    }
+
+    async function safeLoad() {
+      try {
+        await loadCategories();
+      } catch (err) {
+        setContentState("Не удалось загрузить данные");
+        showError(err);
+      }
+    }
+
+    async function refreshCurrentView() {
+      if (state.refreshBusy) return;
+      state.refreshBusy = true;
+      try {
+        if (state.currentCategory) {
+          await selectCategory(state.currentCategory, { keepAthlete: true });
+        } else {
+          await safeLoad();
+        }
+      } catch (err) {
+        showError(err);
+      } finally {
+        state.refreshBusy = false;
+      }
+    }
+
+    elReload.onclick = async () => {
+      await refreshCurrentView();
+    };
+
+    elViewMode.onchange = () => {
+      state.viewMode = elViewMode.value === "timeline"
+        ? "timeline"
+        : (elViewMode.value === "topcat" ? "topcat" : "cards");
+      if (state.viewMode === "topcat" && state.currentCategory) {
+        renderCategoryTop(state.currentCategory).catch(showError);
+        return;
+      }
+      if (state.currentAthlete && state.currentDetails) {
+        elContent.innerHTML = renderAthleteContent(state.currentAthlete, state.currentDetails);
+      }
+    };
+
+    function setAutoRefresh(enabled) {
+      if (state.autoRefreshTimer) {
+        clearInterval(state.autoRefreshTimer);
+        state.autoRefreshTimer = null;
+      }
+      if (!enabled) return;
+      state.autoRefreshTimer = setInterval(async () => {
+        await refreshCurrentView();
+      }, 30000);
+    }
+
+    elAutoRefresh.onchange = () => setAutoRefresh(elAutoRefresh.checked);
+
+    function updateToTop() {
+      const y = window.scrollY || document.documentElement.scrollTop || 0;
+      elToTop.classList.toggle("show", y > 240);
+    }
+
+    elToTop.onclick = () => window.scrollTo({ top: 0, behavior: "smooth" });
+    window.addEventListener("scroll", updateToTop, { passive: true });
+    updateToTop();
+
+    elCatFilter.oninput = () => renderCategories();
+    elAthFilter.oninput = () => renderAthletes();
+
+    function connectLiveStream() {
+      try {
+        if (liveSource) {
+          liveSource.close();
+          liveSource = null;
+        }
+        liveSource = new EventSource("/api/stream");
+        liveSource.addEventListener("change", () => {
+          if (document.hidden) return;
+          if (liveRefreshTimer) return;
+          liveRefreshTimer = setTimeout(async () => {
+            liveRefreshTimer = null;
+            await refreshCurrentView();
+          }, 250);
+        });
+        liveSource.onerror = () => {
+          // EventSource reconnects automatically.
+        };
+      } catch (_e) {
+        // If EventSource is unavailable, manual/auto refresh still works.
+      }
+    }
+
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        refreshCurrentView().catch(showError);
+      }
+    });
+
+    connectLiveStream();
+    safeLoad();
+  </script>
+</body>
+</html>

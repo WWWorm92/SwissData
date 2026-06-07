@@ -2,10 +2,10 @@
 
 
 a = Analysis(
-    ['client_qt.py'],
+    ['main_qt.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('overlay_test.html', '.'), ('flags', 'flags')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='QuantumClient',
+    name='QuantumServerQt',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
