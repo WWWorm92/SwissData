@@ -1,50 +1,54 @@
 # SwissData
 
-SwissData is a set of tools for working with timing data from races and training runs.
+SwissData - набор программ для работы с результатами соревнований и тренировок.
 
-## What it does
+## Что внутри
 
-- receives race data from the timing server
-- shows current results in a web interface
-- groups athletes by category
-- shows athlete history by distance
-- shows best results and all splits
-- generates protocols and test data
-- includes desktop tools and simulators for testing
+- прием данных от тайминга
+- веб-страница со статистикой
+- список категорий и спортсменов
+- история заездов по каждому спортсмену
+- лучшие результаты и отсечки
+- протоколы и тестовые данные
+- инструменты для проверки и демонстрации
 
-## How to use
+## Как пользоваться
 
-### 1. Run the stats website
+### 1. Запустите сервис статистики
 
-Start `SwissStatsService.exe` and open the local web page it provides.
+Откройте `SwissStatsService.exe`.
 
-### 2. Run the server
+### 2. Запустите сервер
 
-Start `QuantumServerQt.exe` to receive timing data and send results to the stats website.
+Откройте `QuantumServerQt.exe`.
 
-### 3. Open the web interface
+### 3. Откройте страницу статистики
 
-In the browser you can:
+В браузере откроется удобная страница, где можно:
 
-- select a category
-- pick an athlete
-- view all runs for that athlete
-- see the best result and all splits
-- open the category top list
+- выбрать категорию
+- выбрать спортсмена
+- посмотреть все заезды
+- увидеть лучший результат
+- посмотреть все отсечки
+- открыть рейтинг спортсменов в категории
 
-### 4. Generate protocols
+### 4. Если нужны протоколы
 
-Use the client tools to build protocols from saved race data.
+Используйте `QuantumClient.exe` для подготовки протоколов и работы с данными.
 
-## Included tools
+## Что есть в проекте
 
-- `QuantumServerQt.exe` - main timing server
-- `SwissStatsService.exe` - web statistics service
-- `QuantumClient.exe` - client/protocol tool
-- `QuantumSimulator.exe` - simulator
+- `QuantumServerQt.exe` - основной сервер
+- `SwissStatsService.exe` - веб-статистика
+- `QuantumClient.exe` - клиент и протоколы
+- `QuantumSimulator.exe` - симулятор
 
-## Notes
+## Для чего это
 
-- The project is designed for live race data and offline test data.
-- If you have saved results, they can be shown in the stats web interface.
-- Test files and simulators are included for checking how the system behaves with sample data.
+Проект подходит для:
+
+- живой работы на старте
+- просмотра результатов после заезда
+- тестирования на примерных данных
+- подготовки протоколов и отчётов
