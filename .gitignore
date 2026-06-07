@@ -1,0 +1,39 @@
+# IDE
+.idea/
+
+# Python caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Build artifacts
+build/
+dist/
+exe/
+release_portable/
+
+# Local database/runtime files
+web_stats_results.db
+web_stats_results.db-wal
+web_stats_results.db-shm
+web_stats_service/results.db
+web_stats_service/__pycache__/
+release_portable/*.db
+release_portable/*.db-wal
+release_portable/*.db-shm
+
+# Temporary files
+.tmp_*
+
+# Local app state
+client_qt_roster.json
+client_qt_settings.json
+obs_state.json
+obs_live.txt
+state.json
+
+# Generated samples / exports
+protocol_all.xlsx
+протокол.xlsx
+тест*.xlsx
